@@ -73,11 +73,9 @@ class PostgresDocumentIntegrationTest {
         registry.add("spring.flyway.enabled", () -> "true");
         registry.add("spring.flyway.locations", () -> "classpath:db/migration/postgres");
 
-        registry.add("embedding.api.base-url", () -> "http://" + embeddingApi.getHost() + ":" + embeddingApi.getMappedPort(8080));
-        registry.add("embedding.api.path", () -> "/v1/embeddings");
-        registry.add("embedding.api.model", () -> "test-embedding-model");
-        registry.add("embedding.api.api-key", () -> "");
-        registry.add("embedding.api.dimensions", () -> 1024);
+        registry.add("spring.ai.openai.base-url", () -> "http://" + embeddingApi.getHost() + ":" + embeddingApi.getMappedPort(8080));
+        registry.add("spring.ai.openai.embedding.options.model", () -> "test-embedding-model");
+        registry.add("spring.ai.openai.api-key", () -> "test-key");
     }
 
 /*    @BeforeAll

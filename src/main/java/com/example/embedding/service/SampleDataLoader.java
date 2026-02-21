@@ -1,6 +1,5 @@
 package com.example.embedding.service;
 
-import com.example.embedding.config.EmbeddingApiProperties;
 import com.example.embedding.repository.DocumentRepository;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -16,16 +15,13 @@ public class SampleDataLoader implements ApplicationRunner {
 
     private final DocumentRepository repository;
     private final EmbeddingService deterministicEmbeddingService;
-    private final EmbeddingApiProperties properties;
     private final WikipediaClient wikipediaClient;
 
     public SampleDataLoader(DocumentRepository repository,
                             EmbeddingService deterministicEmbeddingService,
-                            EmbeddingApiProperties properties,
                             WikipediaClient wikipediaClient) {
         this.repository = repository;
         this.deterministicEmbeddingService = deterministicEmbeddingService;
-        this.properties = properties;
         this.wikipediaClient = wikipediaClient;
     }
 

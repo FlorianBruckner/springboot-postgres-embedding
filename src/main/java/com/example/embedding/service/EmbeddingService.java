@@ -1,22 +1,17 @@
 package com.example.embedding.service;
 
-import com.example.embedding.config.EmbeddingApiProperties;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
+import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 @Service
 public class EmbeddingService {
-    private final RestClient restClient;
-    private final EmbeddingApiProperties properties;
+    private final EmbeddingModel embeddingModel;
 
-    public EmbeddingService(RestClient.Builder builder, EmbeddingApiProperties properties) {
-        this.properties = properties;
-        this.restClient = builder.baseUrl(properties.baseUrl()).build();
+    public EmbeddingService(EmbeddingModel embeddingModel) {
+        this.embeddingModel = embeddingModel;
     }
 
     public List<Float> embed(String input) {
@@ -24,29 +19,11 @@ public class EmbeddingService {
             throw new IllegalArgumentException("Input cannot be blank");
         }
 
-        EmbeddingResponse response = restClient.post()
-                .uri(properties.path())
-                .contentType(MediaType.APPLICATION_JSON)
-                .headers(headers -> addAuthHeader(headers, properties.apiKey()))
-                .body(Map.of("model", properties.model(), "input", input))
-                .retrieve()
-                .body(EmbeddingResponse.class);
-
-        if (response == null || response.data() == null || response.data().isEmpty()) {
-            throw new IllegalStateException("Embedding API returned no vectors");
+        float[] vector = embeddingModel.embed(input);
+        List<Float> result = new ArrayList<>(vector.length);
+        for (float value : vector) {
+            result.add(value);
         }
-        return response.data().getFirst().embedding();
-    }
-
-    private static void addAuthHeader(HttpHeaders headers, String apiKey) {
-        if (apiKey != null && !apiKey.isBlank()) {
-            headers.setBearerAuth(apiKey);
-        }
-    }
-
-    public record EmbeddingResponse(List<EmbeddingData> data) {
-    }
-
-    public record EmbeddingData(List<Float> embedding) {
+        return result;
     }
 }
