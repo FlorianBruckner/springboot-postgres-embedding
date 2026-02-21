@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/embeddings
+    username: postgres
+    password: postgres
+  flyway:
+    enabled: true
+
+embedding:
+  api:
+    base-url: https://api.openai.com
+    path: /v1/embeddings
+    model: text-embedding-3-small
+    api-key: ${OPENAI_API_KEY:}
+    dimensions: 1536
+
+server:
+  error:
+    include-message: always
