@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Java Knowledge Search</title>
+    <style>
+        body {font-family: Arial, sans-serif; margin: 2rem;}
+        textarea, input {width: 100%; padding: .5rem;}
+        .doc {border: 1px solid #ddd; padding: 1rem; margin-top: 1rem; border-radius: 8px;}
+        .meta {color: #666; font-size: .9rem;}
+    </style>
+</head>
+<body>
+<h1>Java Knowledge Search</h1>
+<p th:text="'Available documents: ' + ${count}"></p>
+<form method="get" action="/">
+    <label>Query</label>
+    <input type="text" name="q" th:value="${query}" placeholder="Search Java topics"/>
+    <label>Mode</label>
+    <select name="mode">
+        <option value="keyword" th:selected="${mode == 'keyword'}">Keyword</option>
+        <option value="semantic" th:selected="${mode == 'semantic'}">Semantic</option>
+    </select>
+    <button type="submit">Search</button>
+</form>
+
+<div th:if="${results != null}">
+    <h2 th:text="'Results: ' + ${#lists.size(results)}"></h2>
+    <div th:each="doc : ${results}" class="doc">
+        <h3 th:text="${doc.title}"></h3>
+        <p class="meta" th:text="${doc.updatedAt}"></p>
+        <p th:text="${doc.content}"></p>
+    </div>
+</div>
+</body>
+</html>

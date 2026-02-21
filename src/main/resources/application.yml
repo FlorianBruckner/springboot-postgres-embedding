@@ -1,0 +1,33 @@
+#debug: true
+#logging:
+#    level:
+#        org.apache.hc.client5.http: DEBUG
+#        org.springframework.web.client.RestClient: DEBUG
+#        org.apache.hc.client5.http.wire: DEBUG
+app:
+  database:
+    vendor: postgres
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:25432/postgres
+    username: postgres
+    password: password
+  flyway:
+    enabled: true
+    locations: classpath:db/migration/${app.database.vendor}
+
+embedding:
+  api:
+    base-url: http://localhost:1234
+    path: /v1/embeddings
+    model: text-embedding-qwen3-embedding-0.6b
+    api-key: lm-studio
+    dimensions: 1024
+
+server:
+  error:
+    include-message: always
+
+sample-loader:
+  enabled: true
