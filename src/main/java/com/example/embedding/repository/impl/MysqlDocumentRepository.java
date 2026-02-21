@@ -11,7 +11,6 @@ import org.springframework.stereotype.Repository;
 import java.sql.Timestamp;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -26,7 +25,7 @@ public class MysqlDocumentRepository implements DocumentRepository {
     }
 
     @Override
-    public long create(DocumentCreateRequest request, List<Float> embedding) {
+    public long create(DocumentCreateRequest request, float[] embedding) {
         jdbcTemplate.update(
                 "INSERT INTO documents (title, content, embedding, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
                 request.title(), request.content(), toVectorLiteral(embedding)
@@ -35,7 +34,7 @@ public class MysqlDocumentRepository implements DocumentRepository {
     }
 
     @Override
-    public void update(long id, String content, List<Float> embedding) {
+    public void update(long id, String content, float[] embedding) {
         int updated = jdbcTemplate.update(
                 "UPDATE documents SET content = ?, embedding = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                 content, toVectorLiteral(embedding), id
@@ -61,7 +60,7 @@ public class MysqlDocumentRepository implements DocumentRepository {
     }
 
     @Override
-    public List<Document> semanticSearch(List<Float> queryEmbedding, int limit) {
+    public List<Document> semanticSearch(float[] queryEmbedding, int limit) {
         List<DocumentWithEmbedding> docs = jdbcTemplate.query(
                 "SELECT id, title, content, updated_at, embedding FROM documents",
                 (rs, rowNum) -> new DocumentWithEmbedding(
@@ -83,7 +82,7 @@ public class MysqlDocumentRepository implements DocumentRepository {
     }
 
     @Override
-    public void createSeedDocument(String title, String content, List<Float> embedding) {
+    public void createSeedDocument(String title, String content, float[] embedding) {
         jdbcTemplate.update(
                 "INSERT INTO documents (title, content, embedding, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
                 title, content, toVectorLiteral(embedding)
@@ -103,41 +102,41 @@ public class MysqlDocumentRepository implements DocumentRepository {
         return timestamp.toInstant().atOffset(ZoneOffset.UTC);
     }
 
-    private String toVectorLiteral(List<Float> embedding) {
+    private String toVectorLiteral(float[] embedding) {
         StringBuilder sb = new StringBuilder("[");
-        for (int i = 0; i < embedding.size(); i++) {
+        for (int i = 0; i < embedding.length; i++) {
             if (i > 0) {
                 sb.append(',');
             }
-            sb.append(embedding.get(i));
+            sb.append(embedding[i]);
         }
         sb.append(']');
         return sb.toString();
     }
 
-    private List<Float> parseVector(String vectorLiteral) {
+    private float[] parseVector(String vectorLiteral) {
         String cleaned = vectorLiteral.replace("[", "").replace("]", "").trim();
         if (cleaned.isEmpty()) {
-            return List.of();
+            return new float[0];
         }
         String[] parts = cleaned.split(",");
-        List<Float> values = new ArrayList<>(parts.length);
-        for (String part : parts) {
-            values.add(Float.parseFloat(part.trim()));
+        float[] values = new float[parts.length];
+        for (int i = 0; i < parts.length; i++) {
+            values[i] = Float.parseFloat(parts[i].trim());
         }
         return values;
     }
 
-    private double l2Distance(List<Float> a, List<Float> b) {
-        int size = Math.min(a.size(), b.size());
+    private double l2Distance(float[] a, float[] b) {
+        int size = Math.min(a.length, b.length);
         double sum = 0.0;
         for (int i = 0; i < size; i++) {
-            double diff = a.get(i) - b.get(i);
+            double diff = a[i] - b[i];
             sum += diff * diff;
         }
         return Math.sqrt(sum);
     }
 
-    private record DocumentWithEmbedding(Document document, List<Float> embedding) {
+    private record DocumentWithEmbedding(Document document, float[] embedding) {
     }
 }

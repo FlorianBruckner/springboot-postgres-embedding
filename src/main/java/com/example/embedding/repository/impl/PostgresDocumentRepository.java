@@ -22,7 +22,7 @@ public class PostgresDocumentRepository implements DocumentRepository {
     }
 
     @Override
-    public long create(DocumentCreateRequest request, List<Float> embedding) {
+    public long create(DocumentCreateRequest request, float[] embedding) {
         return jdbcTemplate.queryForObject(
                 """
                         INSERT INTO documents (title, content, embedding)
@@ -37,7 +37,7 @@ public class PostgresDocumentRepository implements DocumentRepository {
     }
 
     @Override
-    public void update(long id, String content, List<Float> embedding) {
+    public void update(long id, String content, float[] embedding) {
         int updated = jdbcTemplate.update(
                 """
                         UPDATE documents
@@ -75,7 +75,7 @@ public class PostgresDocumentRepository implements DocumentRepository {
     }
 
     @Override
-    public List<Document> semanticSearch(List<Float> queryEmbedding, int limit) {
+    public List<Document> semanticSearch(float[] queryEmbedding, int limit) {
         return jdbcTemplate.query(
                 """
                         SELECT id, title, content, updated_at
@@ -93,7 +93,7 @@ public class PostgresDocumentRepository implements DocumentRepository {
     }
 
     @Override
-    public void createSeedDocument(String title, String content, List<Float> embedding) {
+    public void createSeedDocument(String title, String content, float[] embedding) {
         jdbcTemplate.update(
                 """
                         INSERT INTO documents (title, content, embedding)
@@ -112,13 +112,13 @@ public class PostgresDocumentRepository implements DocumentRepository {
         );
     }
 
-    private String toVectorLiteral(List<Float> embedding) {
+    private String toVectorLiteral(float[] embedding) {
         StringBuilder sb = new StringBuilder("[");
-        for (int i = 0; i < embedding.size(); i++) {
+        for (int i = 0; i < embedding.length; i++) {
             if (i > 0) {
                 sb.append(',');
             }
-            sb.append(embedding.get(i));
+            sb.append(embedding[i]);
         }
         sb.append(']');
         return sb.toString();

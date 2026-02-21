@@ -33,7 +33,7 @@ public class SampleDataLoader implements ApplicationRunner {
 
         List<WikipediaClient.WikipediaArticle> articles = wikipediaClient.fetchRandomGermanArticles(SAMPLE_SIZE);
         for (WikipediaClient.WikipediaArticle article : articles) {
-            List<Float> embedding = deterministicEmbeddingService.embed(article.extract());
+            float[] embedding = deterministicEmbeddingService.embed(article.extract());
             repository.createSeedDocument(article.title(), article.extract(), embedding);
         }
     }

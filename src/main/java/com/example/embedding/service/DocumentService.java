@@ -18,12 +18,12 @@ public class DocumentService {
     }
 
     public long create(DocumentCreateRequest request) {
-        List<Float> embedding = embeddingService.embed(request.content());
+        float[] embedding = embeddingService.embed(request.content());
         return repository.create(request, embedding);
     }
 
     public void update(long id, String content) {
-        List<Float> embedding = embeddingService.embed(content);
+        float[] embedding = embeddingService.embed(content);
         repository.update(id, content, embedding);
     }
 
@@ -37,7 +37,7 @@ public class DocumentService {
     }
 
     public List<Document> semanticSearch(String query) {
-        List<Float> queryEmbedding = embeddingService.embed(query);
+        float[] queryEmbedding = embeddingService.embed(query);
         return repository.semanticSearch(queryEmbedding, 20);
     }
 
