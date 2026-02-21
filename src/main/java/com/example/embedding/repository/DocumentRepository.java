@@ -7,17 +7,16 @@ import java.util.List;
 import java.util.Optional;
 
 public interface DocumentRepository {
-    long create(DocumentCreateRequest request, float[] embedding);
+    long create(DocumentCreateRequest request);
 
-    void update(long id, String content, float[] embedding);
+    void update(long id, String content);
 
     Optional<Document> findById(long id);
 
-    List<Document> keywordSearch(String term, int limit);
+    List<Document> findByIds(List<Long> ids);
 
-    List<Document> semanticSearch(float[] queryEmbedding, int limit);
+    List<Document> keywordSearch(String term, int limit);
 
     long count();
 
-    void createSeedDocument(String title, String content, float[] embedding);
 }

@@ -8,7 +8,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
+import java.sql.Timestamp;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -16,38 +18,28 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Repository
-@ConditionalOnProperty(prefix = "app.database", name = "vendor", havingValue = "postgres", matchIfMissing = true)
-public class PostgresDocumentRepository implements DocumentRepository {
+@ConditionalOnProperty(prefix = "app.database", name = "vendor", havingValue = "mariadb")
+public class MariadbDocumentRepository implements DocumentRepository {
     private final JdbcTemplate jdbcTemplate;
 
-    public PostgresDocumentRepository(JdbcTemplate jdbcTemplate) {
+    public MariadbDocumentRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
     }
 
     @Override
     public long create(DocumentCreateRequest request) {
-        return jdbcTemplate.queryForObject(
-                """
-                        INSERT INTO documents (title, content)
-                        VALUES (?, ?)
-                        RETURNING id
-                        """,
-                Long.class,
-                request.title(),
-                request.content()
+        jdbcTemplate.update(
+                "INSERT INTO documents (title, content, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
+                request.title(), request.content()
         );
+        return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
     }
 
     @Override
     public void update(long id, String content) {
         int updated = jdbcTemplate.update(
-                """
-                        UPDATE documents
-                        SET content = ?, updated_at = NOW()
-                        WHERE id = ?
-                        """,
-                content,
-                id
+                "UPDATE documents SET content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                content, id
         );
         if (updated == 0) {
             throw new IllegalArgumentException("Document not found: " + id);
@@ -57,8 +49,7 @@ public class PostgresDocumentRepository implements DocumentRepository {
     @Override
     public Optional<Document> findById(long id) {
         return jdbcTemplate.query("SELECT id, title, content, updated_at FROM documents WHERE id = ?", rowMapper(), id)
-                .stream()
-                .findFirst();
+                .stream().findFirst();
     }
 
     @Override
@@ -85,15 +76,10 @@ public class PostgresDocumentRepository implements DocumentRepository {
 
     @Override
     public List<Document> keywordSearch(String term, int limit) {
+        String like = "%" + term + "%";
         return jdbcTemplate.query(
-                """
-                        SELECT id, title, content, updated_at
-                        FROM documents
-                        WHERE to_tsvector('english', title || ' ' || content) @@ plainto_tsquery('english', ?)
-                        ORDER BY updated_at DESC
-                        LIMIT ?
-                        """,
-                rowMapper(), term, limit
+                "SELECT id, title, content, updated_at FROM documents WHERE title LIKE ? OR content LIKE ? ORDER BY updated_at DESC LIMIT ?",
+                rowMapper(), like, like, limit
         );
     }
 
@@ -107,7 +93,11 @@ public class PostgresDocumentRepository implements DocumentRepository {
                 rs.getLong("id"),
                 rs.getString("title"),
                 rs.getString("content"),
-                rs.getObject("updated_at", OffsetDateTime.class)
+                toOffsetDateTime(rs.getTimestamp("updated_at"))
         );
+    }
+
+    private OffsetDateTime toOffsetDateTime(Timestamp timestamp) {
+        return timestamp.toInstant().atOffset(ZoneOffset.UTC);
     }
 }

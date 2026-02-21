@@ -10,21 +10,23 @@ import java.util.List;
 @Service
 public class DocumentService {
     private final DocumentRepository repository;
-    private final EmbeddingService embeddingService;
+    private final DocumentVectorStoreService vectorStoreService;
 
-    public DocumentService(DocumentRepository repository, EmbeddingService embeddingService) {
+    public DocumentService(DocumentRepository repository, DocumentVectorStoreService vectorStoreService) {
         this.repository = repository;
-        this.embeddingService = embeddingService;
+        this.vectorStoreService = vectorStoreService;
     }
 
     public long create(DocumentCreateRequest request) {
-        float[] embedding = embeddingService.embed(request.content());
-        return repository.create(request, embedding);
+        long id = repository.create(request);
+        vectorStoreService.upsert(id, request.title(), request.content());
+        return id;
     }
 
     public void update(long id, String content) {
-        float[] embedding = embeddingService.embed(content);
-        repository.update(id, content, embedding);
+        repository.update(id, content);
+        Document updated = findById(id);
+        vectorStoreService.upsert(id, updated.title(), updated.content());
     }
 
     public Document findById(long id) {
@@ -37,8 +39,8 @@ public class DocumentService {
     }
 
     public List<Document> semanticSearch(String query) {
-        float[] queryEmbedding = embeddingService.embed(query);
-        return repository.semanticSearch(queryEmbedding, 20);
+        List<Long> ids = vectorStoreService.searchIds(query, 20);
+        return repository.findByIds(ids);
     }
 
     public long count() {

@@ -1,7 +1,5 @@
 package com.example.embedding;
 
-import org.flywaydb.core.Flyway;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -9,7 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.MySQLContainer;
+import org.testcontainers.containers.MariaDBContainer;
 import org.testcontainers.images.builder.ImageFromDockerfile;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -25,10 +23,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers
-class MysqlDocumentIntegrationTest {
+class MariadbDocumentIntegrationTest {
 
     @Container
-    static MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.4")
+    static MariaDBContainer<?> mariadb = new MariaDBContainer<>("mariadb:11.4")
             .withDatabaseName("testdb")
             .withUsername("test")
             .withPassword("test");
@@ -64,37 +62,32 @@ class MysqlDocumentIntegrationTest {
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", mysql::getJdbcUrl);
-        registry.add("spring.datasource.username", mysql::getUsername);
-        registry.add("spring.datasource.password", mysql::getPassword);
+        registry.add("spring.datasource.url", mariadb::getJdbcUrl);
+        registry.add("spring.datasource.username", mariadb::getUsername);
+        registry.add("spring.datasource.password", mariadb::getPassword);
         registry.add("sample-loader.enabled", () -> "false");
-        registry.add("app.database.vendor", () -> "mysql");
+        registry.add("app.database.vendor", () -> "mariadb");
 
         registry.add("spring.flyway.enabled", () -> "true");
-        registry.add("spring.flyway.locations", () -> "classpath:db/migration/mysql");
+        registry.add("spring.flyway.locations", () -> "classpath:db/migration/mariadb");
 
         registry.add("spring.ai.openai.base-url", () -> "http://" + embeddingApi.getHost() + ":" + embeddingApi.getMappedPort(8080));
         registry.add("spring.ai.openai.embedding.options.model", () -> "test-embedding-model");
         registry.add("spring.ai.openai.api-key", () -> "test-key");
+
+        registry.add("spring.ai.vectorstore.pgvector.enabled", () -> "false");
+        registry.add("spring.ai.vectorstore.mariadb.enabled", () -> "true");
+        registry.add("spring.ai.vectorstore.mariadb.initialize-schema", () -> "true");
+        registry.add("spring.ai.vectorstore.mariadb.dimensions", () -> "1536");
     }
 
-/*
-    @BeforeAll
-    static void migrateSchema() {
-        Flyway.configure()
-                .dataSource(mysql.getJdbcUrl(), mysql.getUsername(), mysql.getPassword())
-                .locations("classpath:db/migration/mysql")
-                .load()
-                .migrate();
-    }
-*/
     @LocalServerPort
     int port;
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
     @Test
-    void shouldCreateUpdateAndSearchDocumentsUsingMysqlRepository() throws IOException, InterruptedException {
+    void shouldCreateUpdateAndSearchDocumentsUsingMariadbRepository() throws IOException, InterruptedException {
         HttpResponse<String> createResponse = sendJson("POST", "/api/documents",
                 "{\"title\":\"Java Memory\",\"content\":\"Java manages heap memory and garbage collection efficiently.\"}");
         assertEquals(HttpStatus.CREATED.value(), createResponse.statusCode());

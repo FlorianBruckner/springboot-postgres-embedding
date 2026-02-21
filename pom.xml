@@ -54,6 +54,14 @@
             <artifactId>spring-ai-starter-model-openai</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-vector-store-pgvector</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-starter-vector-store-mariadb</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-database-postgresql</artifactId>
         </dependency>
@@ -67,8 +75,8 @@
             <scope>runtime</scope>
         </dependency>
         <dependency>
-            <groupId>com.mysql</groupId>
-            <artifactId>mysql-connector-j</artifactId>
+            <groupId>org.mariadb.jdbc</groupId>
+            <artifactId>mariadb-java-client</artifactId>
             <scope>runtime</scope>
         </dependency>
         <dependency>
@@ -96,7 +104,8 @@
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
-            <artifactId>testcontainers-mysql</artifactId>
+            <artifactId>mariadb</artifactId>
+            <version>1.20.4</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

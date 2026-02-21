@@ -1,6 +1,6 @@
 package com.example.embedding.service;
 
-import com.example.embedding.repository.DocumentRepository;
+import com.example.embedding.model.DocumentCreateRequest;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -13,28 +13,23 @@ import java.util.List;
 public class SampleDataLoader implements ApplicationRunner {
     private static final int SAMPLE_SIZE = 100;
 
-    private final DocumentRepository repository;
-    private final EmbeddingService deterministicEmbeddingService;
+    private final DocumentService documentService;
     private final WikipediaClient wikipediaClient;
 
-    public SampleDataLoader(DocumentRepository repository,
-                            EmbeddingService deterministicEmbeddingService,
-                            WikipediaClient wikipediaClient) {
-        this.repository = repository;
-        this.deterministicEmbeddingService = deterministicEmbeddingService;
+    public SampleDataLoader(DocumentService documentService, WikipediaClient wikipediaClient) {
+        this.documentService = documentService;
         this.wikipediaClient = wikipediaClient;
     }
 
     @Override
     public void run(ApplicationArguments args) {
-        if (repository.count() > 0) {
+        if (documentService.count() > 0) {
             return;
         }
 
         List<WikipediaClient.WikipediaArticle> articles = wikipediaClient.fetchRandomGermanArticles(SAMPLE_SIZE);
         for (WikipediaClient.WikipediaArticle article : articles) {
-            float[] embedding = deterministicEmbeddingService.embed(article.extract());
-            repository.createSeedDocument(article.title(), article.extract(), embedding);
+            documentService.create(new DocumentCreateRequest(article.title(), article.extract()));
         }
     }
 }

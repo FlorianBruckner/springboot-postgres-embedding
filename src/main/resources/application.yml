@@ -20,6 +20,13 @@ spring:
       chat:
         options:
           model: qwen3-4b-instruct-2507
+    vectorstore:
+      pgvector:
+        enabled: true
+        initialize-schema: true
+      mariadb:
+        enabled: false
+        initialize-schema: true
 
 server:
   error:

@@ -1,7 +1,5 @@
 package com.example.embedding;
 
-import org.flywaydb.core.Flyway;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -76,16 +74,12 @@ class PostgresDocumentIntegrationTest {
         registry.add("spring.ai.openai.base-url", () -> "http://" + embeddingApi.getHost() + ":" + embeddingApi.getMappedPort(8080));
         registry.add("spring.ai.openai.embedding.options.model", () -> "test-embedding-model");
         registry.add("spring.ai.openai.api-key", () -> "test-key");
-    }
 
-/*    @BeforeAll
-    static void migrateSchema() {
-        Flyway.configure()
-                .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
-                .locations("classpath:db/migration/postgres")
-                .load()
-                .migrate();
-    }*/
+        registry.add("spring.ai.vectorstore.pgvector.enabled", () -> "true");
+        registry.add("spring.ai.vectorstore.pgvector.initialize-schema", () -> "true");
+        registry.add("spring.ai.vectorstore.pgvector.dimensions", () -> "1024");
+        registry.add("spring.ai.vectorstore.mariadb.enabled", () -> "false");
+    }
 
     @LocalServerPort
     int port;
