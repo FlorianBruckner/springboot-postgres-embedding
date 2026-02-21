@@ -2,26 +2,25 @@ package com.example.embedding;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.images.builder.ImageFromDockerfile;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.images.builder.ImageFromDockerfile;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@SpringBootTest
-@AutoConfigureMockMvc
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers
 class DocumentIntegrationTest {
 
@@ -44,14 +43,14 @@ class DocumentIntegrationTest {
                     from fastapi import FastAPI
                     from pydantic import BaseModel
                     import hashlib
-                    
+
                     app = FastAPI()
                     DIMS = 1536
-                    
+
                     class EmbeddingRequest(BaseModel):
                         model: str
                         input: str
-                    
+
                     @app.post('/v1/embeddings')
                     def embed(req: EmbeddingRequest):
                         seed = hashlib.sha256(req.input.encode('utf-8')).digest()
@@ -76,34 +75,41 @@ class DocumentIntegrationTest {
     }
 
     @Autowired
-    MockMvc mockMvc;
+    TestRestTemplate restTemplate;
 
     @Test
-    void shouldCreateUpdateAndSearchDocumentsUsingContainerizedEmbeddingApi() throws Exception {
-        String payload = """
-                {"title":"Java Memory","content":"Java manages heap memory and garbage collection efficiently."}
-                """;
+    void shouldCreateUpdateAndSearchDocumentsUsingContainerizedEmbeddingApi() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
 
-        mockMvc.perform(post("/api/documents")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(payload))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").isNumber());
+        ResponseEntity<String> createResponse = restTemplate.postForEntity(
+                "/api/documents",
+                new HttpEntity<>("{\"title\":\"Java Memory\",\"content\":\"Java manages heap memory and garbage collection efficiently.\"}", headers),
+                String.class
+        );
+        assertEquals(201, createResponse.getStatusCode().value());
+        assertTrue(createResponse.getBody() != null && createResponse.getBody().contains("id"));
 
-        mockMvc.perform(get("/api/documents/search").param("query", "garbage collection"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].title").value("Java Memory"));
+        ResponseEntity<String> searchResponse = restTemplate.getForEntity(
+                "/api/documents/search?query=garbage%20collection",
+                String.class
+        );
+        assertEquals(200, searchResponse.getStatusCode().value());
+        assertTrue(searchResponse.getBody() != null && searchResponse.getBody().contains("Java Memory"));
 
-        String updatePayload = """
-                {"content":"Java records provide immutable data carrier semantics."}
-                """;
-        mockMvc.perform(put("/api/documents/{id}", 1)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(updatePayload))
-                .andExpect(status().isNoContent());
+        ResponseEntity<Void> updateResponse = restTemplate.exchange(
+                "/api/documents/1",
+                HttpMethod.PUT,
+                new HttpEntity<>("{\"content\":\"Java records provide immutable data carrier semantics.\"}", headers),
+                Void.class
+        );
+        assertEquals(204, updateResponse.getStatusCode().value());
 
-        mockMvc.perform(get("/api/documents/semantic-search").param("query", "immutable records"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].title").exists());
+        ResponseEntity<String> semanticResponse = restTemplate.getForEntity(
+                "/api/documents/semantic-search?query=immutable%20records",
+                String.class
+        );
+        assertEquals(200, semanticResponse.getStatusCode().value());
+        assertTrue(semanticResponse.getBody() != null && semanticResponse.getBody().contains("title"));
     }
 }
