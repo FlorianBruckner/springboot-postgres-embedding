@@ -17,3 +17,7 @@ embedding:
 server:
   error:
     include-message: always
+
+
+sample-loader:
+  enabled: true
