@@ -1,14 +1,9 @@
 package com.example.embedding;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
@@ -16,6 +11,12 @@ import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.images.builder.ImageFromDockerfile;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -74,42 +75,45 @@ class MysqlDocumentIntegrationTest {
         registry.add("embedding.api.dimensions", () -> 1536);
     }
 
-    @Autowired
-    TestRestTemplate restTemplate;
+    @LocalServerPort
+    int port;
+
+    private final HttpClient httpClient = HttpClient.newHttpClient();
 
     @Test
-    void shouldCreateUpdateAndSearchDocumentsUsingMysqlRepository() {
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
+    void shouldCreateUpdateAndSearchDocumentsUsingMysqlRepository() throws IOException, InterruptedException {
+        HttpResponse<String> createResponse = sendJson("POST", "/api/documents",
+                "{\"title\":\"Java Memory\",\"content\":\"Java manages heap memory and garbage collection efficiently.\"}");
+        assertEquals(HttpStatus.CREATED.value(), createResponse.statusCode());
+        assertTrue(createResponse.body().contains("id"));
 
-        ResponseEntity<String> createResponse = restTemplate.postForEntity(
-                "/api/documents",
-                new HttpEntity<>("{\"title\":\"Java Memory\",\"content\":\"Java manages heap memory and garbage collection efficiently.\"}", headers),
-                String.class
-        );
-        assertEquals(201, createResponse.getStatusCode().value());
-        assertTrue(createResponse.getBody() != null && createResponse.getBody().contains("id"));
+        HttpResponse<String> searchResponse = send("GET", "/api/documents/search?query=garbage%20collection");
+        assertEquals(HttpStatus.OK.value(), searchResponse.statusCode());
+        assertTrue(searchResponse.body().contains("Java Memory"));
 
-        ResponseEntity<String> searchResponse = restTemplate.getForEntity(
-                "/api/documents/search?query=garbage%20collection",
-                String.class
-        );
-        assertEquals(200, searchResponse.getStatusCode().value());
-        assertTrue(searchResponse.getBody() != null && searchResponse.getBody().contains("Java Memory"));
+        HttpResponse<String> updateResponse = sendJson("PUT", "/api/documents/1",
+                "{\"content\":\"Java records provide immutable data carrier semantics.\"}");
+        assertEquals(HttpStatus.NO_CONTENT.value(), updateResponse.statusCode());
 
-        ResponseEntity<Void> updateResponse = restTemplate.exchange(
-                "/api/documents/1",
-                HttpMethod.PUT,
-                new HttpEntity<>("{\"content\":\"Java records provide immutable data carrier semantics.\"}", headers),
-                Void.class
-        );
-        assertEquals(204, updateResponse.getStatusCode().value());
+        HttpResponse<String> semanticResponse = send("GET", "/api/documents/semantic-search?query=immutable%20records");
+        assertEquals(HttpStatus.OK.value(), semanticResponse.statusCode());
+        assertTrue(semanticResponse.body().contains("title"));
+    }
 
-        ResponseEntity<String> semanticResponse = restTemplate.getForEntity(
-                "/api/documents/semantic-search?query=immutable%20records",
-                String.class
-        );
-        assertEquals(200, semanticResponse.getStatusCode().value());
-        assertTrue(semanticResponse.getBody() != null && semanticResponse.getBody().contains("title"));
+    private HttpResponse<String> send(String method, String path) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("http://localhost:" + port + path))
+                .method(method, HttpRequest.BodyPublishers.noBody())
+                .build();
+        return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    private HttpResponse<String> sendJson(String method, String path, String body) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("http://localhost:" + port + path))
+                .header("Content-Type", "application/json")
+                .method(method, HttpRequest.BodyPublishers.ofString(body))
+                .build();
+        return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     }
 }
