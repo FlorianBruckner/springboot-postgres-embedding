@@ -10,6 +10,7 @@ Spring Boot (Maven) web app that stores large text documents (up to 10 MB), uses
   - MariaDB Vector Store for MariaDB
 - Embedding and chat generation through Spring AI OpenAI-compatible integration.
 - Keyword and semantic search endpoints for document retrieval.
+- Document metadata/properties can be stored in VectorStore metadata and used in semantic filter expressions.
 - RAG pipeline endpoint (`POST /api/rag/ask`) that uses semantic retrieval + LLM answer generation.
 - Simple Thymeleaf UI at `/` for keyword and semantic querying.
 - Seeds up to ~100 random German Wikipedia articles at startup if the table is empty.
@@ -26,6 +27,10 @@ Set in `src/main/resources/application.yml`:
 - `spring.ai.vectorstore.pgvector.*`
 - `spring.ai.vectorstore.mariadb.*`
 - `sample-loader.enabled` (optional, default: `true`)
+
+### Semantic search filters
+- `GET /api/documents/semantic-search?query=...&filterExpression=...`
+- `POST /api/documents` accepts optional `properties` JSON object that is persisted as VectorStore metadata.
 
 ## Run
 ```bash

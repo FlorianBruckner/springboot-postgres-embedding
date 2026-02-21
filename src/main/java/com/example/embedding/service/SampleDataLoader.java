@@ -7,6 +7,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 
 @Component
 @ConditionalOnProperty(prefix = "sample-loader", name = "enabled", havingValue = "true", matchIfMissing = true)
@@ -29,7 +30,7 @@ public class SampleDataLoader implements ApplicationRunner {
 
         List<WikipediaClient.WikipediaArticle> articles = wikipediaClient.fetchRandomGermanArticles(SAMPLE_SIZE);
         for (WikipediaClient.WikipediaArticle article : articles) {
-            documentService.create(new DocumentCreateRequest(article.title(), article.extract()));
+            documentService.create(new DocumentCreateRequest(article.title(), article.extract(), Map.of()));
         }
     }
 }

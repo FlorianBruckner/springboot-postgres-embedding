@@ -43,7 +43,8 @@ public class DocumentRestController {
     }
 
     @GetMapping("/semantic-search")
-    public List<Document> semanticSearch(@RequestParam String query) {
-        return service.semanticSearch(query);
+    public List<Document> semanticSearch(@RequestParam String query,
+                                         @RequestParam(required = false) String filterExpression) {
+        return service.semanticSearch(query, filterExpression);
     }
 }

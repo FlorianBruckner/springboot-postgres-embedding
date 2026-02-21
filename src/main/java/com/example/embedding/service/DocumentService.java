@@ -19,14 +19,14 @@ public class DocumentService {
 
     public long create(DocumentCreateRequest request) {
         long id = repository.create(request);
-        vectorStoreService.upsert(id, request.title(), request.content());
+        vectorStoreService.upsert(id, request.title(), request.content(), request.propertiesOrEmpty());
         return id;
     }
 
     public void update(long id, String content) {
         repository.update(id, content);
         Document updated = findById(id);
-        vectorStoreService.upsert(id, updated.title(), updated.content());
+        vectorStoreService.upsert(id, updated.title(), updated.content(), null);
     }
 
     public Document findById(long id) {
@@ -39,7 +39,11 @@ public class DocumentService {
     }
 
     public List<Document> semanticSearch(String query) {
-        List<Long> ids = vectorStoreService.searchIds(query, 20);
+        return semanticSearch(query, null);
+    }
+
+    public List<Document> semanticSearch(String query, String filterExpression) {
+        List<Long> ids = vectorStoreService.searchIds(query, 20, filterExpression);
         return repository.findByIds(ids);
     }
 
