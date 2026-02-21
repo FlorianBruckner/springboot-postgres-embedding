@@ -11,7 +11,6 @@ import org.springframework.stereotype.Repository;
 import java.sql.Timestamp;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -27,7 +26,7 @@ public class MysqlDocumentRepository implements DocumentRepository {
     @Override
     public long create(DocumentCreateRequest request, float[] embedding) {
         jdbcTemplate.update(
-                "INSERT INTO documents (title, content, embedding, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
+                "INSERT INTO documents (title, content, embedding, updated_at) VALUES (?, ?, CAST(? AS VECTOR(1536)), CURRENT_TIMESTAMP)",
                 request.title(), request.content(), toVectorLiteral(embedding)
         );
         return jdbcTemplate.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
@@ -36,7 +35,7 @@ public class MysqlDocumentRepository implements DocumentRepository {
     @Override
     public void update(long id, String content, float[] embedding) {
         int updated = jdbcTemplate.update(
-                "UPDATE documents SET content = ?, embedding = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                "UPDATE documents SET content = ?, embedding = CAST(? AS VECTOR(1536)), updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                 content, toVectorLiteral(embedding), id
         );
         if (updated == 0) {
@@ -61,19 +60,15 @@ public class MysqlDocumentRepository implements DocumentRepository {
 
     @Override
     public List<Document> semanticSearch(float[] queryEmbedding, int limit) {
-        List<DocumentWithEmbedding> docs = jdbcTemplate.query(
-                "SELECT id, title, content, updated_at, embedding FROM documents",
-                (rs, rowNum) -> new DocumentWithEmbedding(
-                        new Document(rs.getLong("id"), rs.getString("title"), rs.getString("content"), toOffsetDateTime(rs.getTimestamp("updated_at"))),
-                        parseVector(rs.getString("embedding"))
-                )
+        return jdbcTemplate.query(
+                """
+                SELECT id, title, content, updated_at
+                FROM documents
+                ORDER BY DISTANCE(embedding, CAST(? AS VECTOR(1536)), 'EUCLIDEAN')
+                LIMIT ?
+                """,
+                rowMapper(), toVectorLiteral(queryEmbedding), limit
         );
-
-        return docs.stream()
-                .sorted(Comparator.comparingDouble(d -> l2Distance(d.embedding(), queryEmbedding)))
-                .limit(limit)
-                .map(DocumentWithEmbedding::document)
-                .toList();
     }
 
     @Override
@@ -84,7 +79,7 @@ public class MysqlDocumentRepository implements DocumentRepository {
     @Override
     public void createSeedDocument(String title, String content, float[] embedding) {
         jdbcTemplate.update(
-                "INSERT INTO documents (title, content, embedding, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
+                "INSERT INTO documents (title, content, embedding, updated_at) VALUES (?, ?, CAST(? AS VECTOR(1536)), CURRENT_TIMESTAMP)",
                 title, content, toVectorLiteral(embedding)
         );
     }
@@ -112,31 +107,5 @@ public class MysqlDocumentRepository implements DocumentRepository {
         }
         sb.append(']');
         return sb.toString();
-    }
-
-    private float[] parseVector(String vectorLiteral) {
-        String cleaned = vectorLiteral.replace("[", "").replace("]", "").trim();
-        if (cleaned.isEmpty()) {
-            return new float[0];
-        }
-        String[] parts = cleaned.split(",");
-        float[] values = new float[parts.length];
-        for (int i = 0; i < parts.length; i++) {
-            values[i] = Float.parseFloat(parts[i].trim());
-        }
-        return values;
-    }
-
-    private double l2Distance(float[] a, float[] b) {
-        int size = Math.min(a.length, b.length);
-        double sum = 0.0;
-        for (int i = 0; i < size; i++) {
-            double diff = a[i] - b[i];
-            sum += diff * diff;
-        }
-        return Math.sqrt(sum);
-    }
-
-    private record DocumentWithEmbedding(Document document, float[] embedding) {
     }
 }
