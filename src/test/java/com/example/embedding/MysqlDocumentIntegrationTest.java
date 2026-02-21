@@ -1,5 +1,7 @@
 package com.example.embedding;
 
+import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -76,6 +78,15 @@ class MysqlDocumentIntegrationTest {
         registry.add("embedding.api.model", () -> "test-embedding-model");
         registry.add("embedding.api.api-key", () -> "");
         registry.add("embedding.api.dimensions", () -> 1536);
+    }
+
+    @BeforeAll
+    static void migrateSchema() {
+        Flyway.configure()
+                .dataSource(mysql.getJdbcUrl(), mysql.getUsername(), mysql.getPassword())
+                .locations("classpath:db/migration/mysql")
+                .load()
+                .migrate();
     }
 
     @LocalServerPort
