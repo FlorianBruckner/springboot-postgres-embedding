@@ -74,6 +74,7 @@ class MariadbDocumentIntegrationTest {
         registry.add("spring.ai.openai.base-url", () -> "http://" + embeddingApi.getHost() + ":" + embeddingApi.getMappedPort(8080));
         registry.add("spring.ai.openai.embedding.options.model", () -> "test-embedding-model");
         registry.add("spring.ai.openai.api-key", () -> "test-key");
+        registry.add("spring.autoconfigure.exclude", () -> "org.springframework.ai.vectorstore.pgvector.autoconfigure.PgVectorStoreAutoConfiguration");
 
         registry.add("spring.ai.vectorstore.pgvector.enabled", () -> "false");
         registry.add("spring.ai.vectorstore.mariadb.enabled", () -> "true");

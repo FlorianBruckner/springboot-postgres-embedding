@@ -74,6 +74,7 @@ class PostgresDocumentIntegrationTest {
         registry.add("spring.ai.openai.base-url", () -> "http://" + embeddingApi.getHost() + ":" + embeddingApi.getMappedPort(8080));
         registry.add("spring.ai.openai.embedding.options.model", () -> "test-embedding-model");
         registry.add("spring.ai.openai.api-key", () -> "test-key");
+        registry.add("spring.autoconfigure.exclude", () -> "org.springframework.ai.vectorstore.mariadb.autoconfigure.MariaDbStoreAutoConfiguration");
 
         registry.add("spring.ai.vectorstore.pgvector.enabled", () -> "true");
         registry.add("spring.ai.vectorstore.pgvector.initialize-schema", () -> "true");
