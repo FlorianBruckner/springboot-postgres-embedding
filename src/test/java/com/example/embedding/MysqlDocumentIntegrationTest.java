@@ -9,7 +9,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.images.builder.ImageFromDockerfile;
@@ -23,10 +23,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
-class DocumentIntegrationTest {
+class MysqlDocumentIntegrationTest {
 
     @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("pgvector/pgvector:pg16")
+    static MySQLContainer<?> mysql = new MySQLContainer<>("mysql:8.4")
             .withDatabaseName("testdb")
             .withUsername("test")
             .withPassword("test");
@@ -44,14 +44,14 @@ class DocumentIntegrationTest {
                     from fastapi import FastAPI
                     from pydantic import BaseModel
                     import hashlib
-                    
+
                     app = FastAPI()
                     DIMS = 1536
-                    
+
                     class EmbeddingRequest(BaseModel):
                         model: str
                         input: str
-                    
+
                     @app.post('/v1/embeddings')
                     def embed(req: EmbeddingRequest):
                         seed = hashlib.sha256(req.input.encode('utf-8')).digest()
@@ -62,11 +62,11 @@ class DocumentIntegrationTest {
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", postgres::getJdbcUrl);
-        registry.add("spring.datasource.username", postgres::getUsername);
-        registry.add("spring.datasource.password", postgres::getPassword);
+        registry.add("spring.datasource.url", mysql::getJdbcUrl);
+        registry.add("spring.datasource.username", mysql::getUsername);
+        registry.add("spring.datasource.password", mysql::getPassword);
         registry.add("sample-loader.enabled", () -> "false");
-        registry.add("app.database.vendor", () -> "postgres");
+        registry.add("app.database.vendor", () -> "mysql");
 
         registry.add("embedding.api.base-url", () -> "http://" + embeddingApi.getHost() + ":" + embeddingApi.getMappedPort(8080));
         registry.add("embedding.api.path", () -> "/v1/embeddings");
@@ -79,7 +79,7 @@ class DocumentIntegrationTest {
     MockMvc mockMvc;
 
     @Test
-    void shouldCreateUpdateAndSearchDocumentsUsingContainerizedEmbeddingApi() throws Exception {
+    void shouldCreateUpdateAndSearchDocumentsUsingMysqlRepository() throws Exception {
         String payload = """
                 {"title":"Java Memory","content":"Java manages heap memory and garbage collection efficiently."}
                 """;
