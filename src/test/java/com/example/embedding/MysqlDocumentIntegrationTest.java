@@ -68,6 +68,9 @@ class MysqlDocumentIntegrationTest {
         registry.add("sample-loader.enabled", () -> "false");
         registry.add("app.database.vendor", () -> "mysql");
 
+        registry.add("spring.flyway.enabled", () -> "true");
+        registry.add("spring.flyway.locations", () -> "classpath:db/migration/mysql");
+
         registry.add("embedding.api.base-url", () -> "http://" + embeddingApi.getHost() + ":" + embeddingApi.getMappedPort(8080));
         registry.add("embedding.api.path", () -> "/v1/embeddings");
         registry.add("embedding.api.model", () -> "test-embedding-model");
