@@ -8,7 +8,7 @@ Spring Boot (Maven) web app that stores large text documents (up to 10 MB), gene
 - On document create/update, embeddings are recalculated via configurable API endpoint.
 - Simple Thymeleaf UI at `/` for keyword and semantic querying.
 - Seeds up to ~1000 random German Wikipedia articles at startup if the table is empty.
-- Integration testing with Testcontainers (PostgreSQL + pgvector image).
+- Integration testing with Testcontainers (PostgreSQL + pgvector + containerized embedding API).
 
 ## Configuration
 Set in `src/main/resources/application.yml`:

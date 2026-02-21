@@ -1,27 +1,24 @@
 package com.example.embedding;
 
-import com.example.embedding.service.EmbeddingService;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.images.builder.ImageFromDockerfile;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -34,35 +31,54 @@ class DocumentIntegrationTest {
             .withUsername("test")
             .withPassword("test");
 
+    @Container
+    static GenericContainer<?> embeddingApi = new GenericContainer<>(new ImageFromDockerfile()
+            .withDockerfileFromBuilder(builder -> builder
+                    .from("python:3.11-slim")
+                    .run("pip install --no-cache-dir fastapi==0.115.6 uvicorn==0.32.1")
+                    .copy("server.py", "/app/server.py")
+                    .workDir("/app")
+                    .cmd("uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8080")
+                    .build())
+            .withFileFromString("server.py", """
+                    from fastapi import FastAPI
+                    from pydantic import BaseModel
+                    import hashlib
+                    
+                    app = FastAPI()
+                    DIMS = 1536
+                    
+                    class EmbeddingRequest(BaseModel):
+                        model: str
+                        input: str
+                    
+                    @app.post('/v1/embeddings')
+                    def embed(req: EmbeddingRequest):
+                        seed = hashlib.sha256(req.input.encode('utf-8')).digest()
+                        vec = [((seed[i % len(seed)] + i) % 255) / 255.0 for i in range(DIMS)]
+                        return {"data": [{"embedding": vec}]}
+                    """))
+            .withExposedPorts(8080);
+
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
         registry.add("sample-loader.enabled", () -> "false");
+
+        registry.add("embedding.api.base-url", () -> "http://" + embeddingApi.getHost() + ":" + embeddingApi.getMappedPort(8080));
+        registry.add("embedding.api.path", () -> "/v1/embeddings");
+        registry.add("embedding.api.model", () -> "test-embedding-model");
+        registry.add("embedding.api.api-key", () -> "");
+        registry.add("embedding.api.dimensions", () -> 1536);
     }
 
     @Autowired
     MockMvc mockMvc;
 
-    @MockBean
-    EmbeddingService embeddingService;
-
-    @BeforeEach
-    void setup() {
-        when(embeddingService.embed(anyString())).thenAnswer(invocation -> {
-            String value = invocation.getArgument(0, String.class);
-            List<Float> vector = new ArrayList<>(1536);
-            float seed = (value.length() % 10) / 10.0f;
-            for (int i = 0; i < 1536; i++) {
-                vector.add(seed);
-            }
-            return vector;
-        });
-    }
-
     @Test
-    void shouldCreateUpdateAndSearchDocuments() throws Exception {
+    void shouldCreateUpdateAndSearchDocumentsUsingContainerizedEmbeddingApi() throws Exception {
         String payload = """
                 {"title":"Java Memory","content":"Java manages heap memory and garbage collection efficiently."}
                 """;
