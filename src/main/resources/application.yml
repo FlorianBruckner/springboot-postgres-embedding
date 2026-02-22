@@ -1,6 +1,8 @@
 app:
   database:
     vendor: postgres
+  semantic-search:
+    similarity-threshold: 0.75
 
 spring:
   datasource:
