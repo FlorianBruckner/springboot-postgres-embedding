@@ -1,4 +1,4 @@
-package com.example.embedding.model;
+package com.dreikraft.ai.embedding.postgres.model;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;

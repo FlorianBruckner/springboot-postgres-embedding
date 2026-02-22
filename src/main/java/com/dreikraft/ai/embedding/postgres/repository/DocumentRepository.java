@@ -1,7 +1,7 @@
-package com.example.embedding.repository;
+package com.dreikraft.ai.embedding.postgres.repository;
 
-import com.example.embedding.model.Document;
-import com.example.embedding.model.DocumentCreateRequest;
+import com.dreikraft.ai.embedding.postgres.model.Document;
+import com.dreikraft.ai.embedding.postgres.model.DocumentCreateRequest;
 
 import java.util.List;
 import java.util.Optional;

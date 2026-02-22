@@ -1,6 +1,6 @@
-package com.example.embedding;
+package com.dreikraft.ai.embedding.postgres;
 
-import com.example.embedding.service.WikipediaClient;
+import com.dreikraft.ai.embedding.postgres.service.WikipediaClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 

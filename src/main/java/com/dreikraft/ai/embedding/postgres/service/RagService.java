@@ -1,6 +1,6 @@
-package com.example.embedding.service;
+package com.dreikraft.ai.embedding.postgres.service;
 
-import com.example.embedding.model.Document;
+import com.dreikraft.ai.embedding.postgres.model.Document;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 

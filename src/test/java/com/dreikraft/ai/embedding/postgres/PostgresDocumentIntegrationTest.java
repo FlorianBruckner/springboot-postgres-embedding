@@ -1,6 +1,6 @@
-package com.example.embedding;
+package com.dreikraft.ai.embedding.postgres;
 
-import com.example.AbstractOllamaTest;
+import com.dreikraft.ai.embedding.postgres.AbstractOllamaTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;

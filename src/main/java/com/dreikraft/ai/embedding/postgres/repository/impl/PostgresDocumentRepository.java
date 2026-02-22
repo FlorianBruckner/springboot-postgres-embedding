@@ -1,8 +1,8 @@
-package com.example.embedding.repository.impl;
+package com.dreikraft.ai.embedding.postgres.repository.impl;
 
-import com.example.embedding.model.Document;
-import com.example.embedding.model.DocumentCreateRequest;
-import com.example.embedding.repository.DocumentRepository;
+import com.dreikraft.ai.embedding.postgres.model.Document;
+import com.dreikraft.ai.embedding.postgres.model.DocumentCreateRequest;
+import com.dreikraft.ai.embedding.postgres.repository.DocumentRepository;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;

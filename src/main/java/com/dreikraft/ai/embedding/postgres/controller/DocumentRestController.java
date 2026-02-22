@@ -1,9 +1,9 @@
-package com.example.embedding.controller;
+package com.dreikraft.ai.embedding.postgres.controller;
 
-import com.example.embedding.model.Document;
-import com.example.embedding.model.DocumentCreateRequest;
-import com.example.embedding.model.DocumentUpdateRequest;
-import com.example.embedding.service.DocumentService;
+import com.dreikraft.ai.embedding.postgres.model.Document;
+import com.dreikraft.ai.embedding.postgres.model.DocumentCreateRequest;
+import com.dreikraft.ai.embedding.postgres.model.DocumentUpdateRequest;
+import com.dreikraft.ai.embedding.postgres.service.DocumentService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;

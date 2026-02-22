@@ -1,4 +1,4 @@
-package com.example.embedding;
+package com.dreikraft.ai.embedding.postgres;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

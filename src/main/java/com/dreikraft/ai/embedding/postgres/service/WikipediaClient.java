@@ -1,4 +1,4 @@
-package com.example.embedding.service;
+package com.dreikraft.ai.embedding.postgres.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

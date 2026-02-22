@@ -1,4 +1,4 @@
-package com.example.embedding.service;
+package com.dreikraft.ai.embedding.postgres.service;
 
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;

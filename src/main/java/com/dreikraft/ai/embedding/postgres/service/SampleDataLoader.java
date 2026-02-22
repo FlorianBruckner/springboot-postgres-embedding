@@ -1,6 +1,6 @@
-package com.example.embedding.service;
+package com.dreikraft.ai.embedding.postgres.service;
 
-import com.example.embedding.model.DocumentCreateRequest;
+import com.dreikraft.ai.embedding.postgres.model.DocumentCreateRequest;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;

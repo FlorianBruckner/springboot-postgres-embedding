@@ -1,7 +1,7 @@
-package com.example.embedding.controller;
+package com.dreikraft.ai.embedding.postgres.controller;
 
-import com.example.embedding.model.RagQueryRequest;
-import com.example.embedding.service.RagService;
+import com.dreikraft.ai.embedding.postgres.model.RagQueryRequest;
+import com.dreikraft.ai.embedding.postgres.service.RagService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;

@@ -9,7 +9,7 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.example</groupId>
+    <groupId>com.dreikraft</groupId>
     <artifactId>springboot-postgres-embedding</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>springboot-postgres-embedding</name>

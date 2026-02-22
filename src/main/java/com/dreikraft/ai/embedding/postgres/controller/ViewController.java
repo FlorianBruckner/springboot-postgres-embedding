@@ -1,6 +1,6 @@
-package com.example.embedding.controller;
+package com.dreikraft.ai.embedding.postgres.controller;
 
-import com.example.embedding.service.DocumentService;
+import com.dreikraft.ai.embedding.postgres.service.DocumentService;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
