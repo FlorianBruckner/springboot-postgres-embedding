@@ -3,6 +3,7 @@ package com.dreikraft.ai.embedding.postgres.service;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
@@ -12,9 +13,13 @@ import java.util.Map;
 @Service
 public class DocumentVectorStoreService {
     private final VectorStore vectorStore;
+    private final double similarityThreshold;
 
-    public DocumentVectorStoreService(VectorStore vectorStore) {
+    public DocumentVectorStoreService(
+            VectorStore vectorStore,
+            @Value("${app.semantic-search.similarity-threshold:0.75}") double similarityThreshold) {
         this.vectorStore = vectorStore;
+        this.similarityThreshold = similarityThreshold;
     }
 
     public void upsert(long id, String title, String content, Map<String, Object> additionalProperties) {
@@ -29,7 +34,10 @@ public class DocumentVectorStoreService {
     }
 
     public List<Long> searchIds(String query, int limit, String filterExpression) {
-        SearchRequest.Builder builder = SearchRequest.builder().query(query).topK(limit);
+        SearchRequest.Builder builder = SearchRequest.builder()
+                .query(query)
+                .topK(limit)
+                .similarityThreshold(similarityThreshold);
         if (filterExpression != null && !filterExpression.isBlank()) {
             builder.filterExpression(filterExpression);
         }
