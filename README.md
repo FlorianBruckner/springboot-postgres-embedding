@@ -13,7 +13,7 @@ Spring Boot (Maven) web app that stores large text documents (up to 10 MB), uses
 - Document metadata/properties can be stored in VectorStore metadata and used in semantic filter expressions.
 - RAG pipeline endpoint (`POST /api/rag/ask`) that uses semantic retrieval + LLM answer generation.
 - Simple Thymeleaf UI at `/` for keyword and semantic querying.
-- Seeds up to ~100 random German Wikipedia articles at startup if the table is empty.
+- Seeds up to ~100 random German Wikipedia articles and related talk-page discussion items at startup if the table is empty, and caches them under `sampledata/articles.json` for reuse on the next start.
 
 ## Configuration
 Set in `src/main/resources/application.yml`:
@@ -27,6 +27,8 @@ Set in `src/main/resources/application.yml`:
 - `spring.ai.vectorstore.pgvector.*`
 - `spring.ai.vectorstore.mariadb.*`
 - `sample-loader.enabled` (optional, default: `true`)
+- `sample-loader.directory` (optional, default: `sampledata`)
+- `sample-loader.file-name` (optional, default: `articles.json`)
 
 ### Semantic search filters
 - `GET /api/documents/semantic-search?query=...&filterExpression=...`
