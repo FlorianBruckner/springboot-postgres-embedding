@@ -19,6 +19,7 @@ spring:
       embedding:
         options:
           model: text-embedding-qwen3-embedding-0.6b
+          dimensions: 1024
       chat:
         options:
           model: qwen3-4b-instruct-2507
@@ -26,9 +27,7 @@ spring:
       pgvector:
         enabled: true
         initialize-schema: true
-      mariadb:
-        enabled: false
-        initialize-schema: true
+        id-type: TEXT
 
 server:
   error:
