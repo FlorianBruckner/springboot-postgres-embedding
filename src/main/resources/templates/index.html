@@ -20,9 +20,15 @@
     <select name="mode">
         <option value="keyword" th:selected="${mode == 'keyword'}">Keyword</option>
         <option value="semantic" th:selected="${mode == 'semantic'}">Semantic</option>
+        <option value="rag" th:selected="${mode == 'rag'}">RAG</option>
     </select>
     <button type="submit">Search</button>
 </form>
+
+<div th:if="${ragAnswer != null}" class="doc">
+    <h2>RAG Answer</h2>
+    <p th:text="${ragAnswer}"></p>
+</div>
 
 <div th:if="${results != null}">
     <h2 th:text="'Results: ' + ${#lists.size(results)}"></h2>
