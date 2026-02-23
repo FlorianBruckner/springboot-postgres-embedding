@@ -21,7 +21,7 @@ import java.util.Map;
 @Component
 @ConditionalOnProperty(prefix = "sample-loader", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class SampleDataLoader implements ApplicationRunner {
-    private static final int SAMPLE_SIZE = 100;
+    private static final int SAMPLE_SIZE = 1000;
     private static final Logger log = LoggerFactory.getLogger(SampleDataLoader.class);
 
     private final DocumentService documentService;

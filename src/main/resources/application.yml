@@ -2,7 +2,7 @@ app:
   database:
     vendor: postgres
   semantic-search:
-    similarity-threshold: 0.75
+    similarity-threshold: 0.5
 
 spring:
   datasource:
@@ -24,7 +24,7 @@ spring:
           dimensions: 1024
       chat:
         options:
-          model: qwen3-4b-instruct-2507
+          model: qwen/qwen3-4b-2507
     vectorstore:
       pgvector:
         enabled: true
