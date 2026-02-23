@@ -17,7 +17,7 @@ public class RagService {
     }
 
     public String answer(String question) {
-        List<Document> references = documentService.semanticSearch(question);
+        List<Document> references = documentService.semanticSearch(question, DocumentService.ARTICLE_FILTER_EXPRESSION);
         StringBuilder context = new StringBuilder();
         for (Document reference : references) {
             context.append("Title: ").append(reference.title()).append('\n')

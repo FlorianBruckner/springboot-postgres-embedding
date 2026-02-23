@@ -2,6 +2,7 @@ package com.dreikraft.ai.embedding.postgres.repository;
 
 import com.dreikraft.ai.embedding.postgres.model.Document;
 import com.dreikraft.ai.embedding.postgres.model.DocumentCreateRequest;
+import com.dreikraft.ai.embedding.postgres.model.DiscussionDocument;
 
 import java.util.List;
 import java.util.Optional;
@@ -16,6 +17,10 @@ public interface DocumentRepository {
     List<Document> findByIds(List<Long> ids);
 
     List<Document> keywordSearch(String term, int limit);
+
+    List<Document> keywordSearchBySampleType(String term, int limit, String sampleType);
+
+    List<DiscussionDocument> findDiscussionsByArticleId(long articleDocumentId);
 
     long count();
 

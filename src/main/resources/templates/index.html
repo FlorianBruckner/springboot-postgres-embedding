@@ -8,6 +8,7 @@
         textarea, input {width: 100%; padding: .5rem;}
         .doc {border: 1px solid #ddd; padding: 1rem; margin-top: 1rem; border-radius: 8px;}
         .meta {color: #666; font-size: .9rem;}
+        .discussion-item {border-left: 3px solid #ddd; padding-left: .75rem; margin-top: .75rem;}
     </style>
 </head>
 <body>
@@ -36,6 +37,19 @@
         <h3 th:text="${doc.title}"></h3>
         <p class="meta" th:text="${doc.updatedAt}"></p>
         <p th:text="${doc.content}"></p>
+
+        <div th:with="threadedDiscussions=${discussionsByArticleId.get(doc.id)}"
+             th:if="${threadedDiscussions != null and !#lists.isEmpty(threadedDiscussions)}">
+            <h4>Threaded discussions</h4>
+            <div th:each="threaded : ${threadedDiscussions}" class="discussion-item"
+                 th:style="'margin-left: ' + (${threaded.depth} * 1.25) + 'rem;'">
+                <p class="meta"
+                   th:text="${threaded.discussion.section} != null and !#strings.isEmpty(threaded.discussion.section)
+                   ? threaded.discussion.section
+                   : threaded.discussion.updatedAt"></p>
+                <p th:text="${threaded.discussion.content}"></p>
+            </div>
+        </div>
     </div>
 </div>
 </body>
