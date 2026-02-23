@@ -44,9 +44,9 @@
                 <div th:each="threaded : ${threadedDiscussions}" class="discussion-item"
                      th:style="'margin-left: ' + (${threaded.depth} * 1.25) + 'rem;'">
                     <p class="meta"
-                       th:text="${threaded.discussion.section} != null and !#strings.isEmpty(threaded.discussion.section)
+                       th:text="${threaded.discussion.section != null and !#strings.isEmpty(threaded.discussion.section)
                        ? threaded.discussion.section
-                       : threaded.discussion.updatedAt"></p>
+                       : threaded.discussion.updatedAt}"></p>
                     <p th:text="${threaded.discussion.content}"></p>
                 </div>
             </div>
