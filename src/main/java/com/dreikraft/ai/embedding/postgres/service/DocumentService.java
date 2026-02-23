@@ -20,13 +20,16 @@ public class DocumentService {
     private final DocumentRepository repository;
     private final DocumentVectorStoreService vectorStoreService;
     private final DiscussionClassificationService discussionClassificationService;
+    private final SemanticSummaryService semanticSummaryService;
 
     public DocumentService(DocumentRepository repository,
                            DocumentVectorStoreService vectorStoreService,
-                           DiscussionClassificationService discussionClassificationService) {
+                           DiscussionClassificationService discussionClassificationService,
+                           SemanticSummaryService semanticSummaryService) {
         this.repository = repository;
         this.vectorStoreService = vectorStoreService;
         this.discussionClassificationService = discussionClassificationService;
+        this.semanticSummaryService = semanticSummaryService;
     }
 
     public long create(DocumentCreateRequest request) {
@@ -35,7 +38,11 @@ public class DocumentService {
         if (isDiscussion(properties)) {
             refreshDiscussionClassifications(properties);
         }
-        vectorStoreService.upsert(id, request.title(), request.content(), properties);
+
+        String embeddingContent = isArticle(properties)
+                ? semanticSummaryService.summarizeDocumentForEmbedding(request.title(), request.content())
+                : request.content();
+        vectorStoreService.upsert(id, request.title(), embeddingContent, properties);
         return id;
     }
 
@@ -46,7 +53,11 @@ public class DocumentService {
         if (isDiscussion(metadata)) {
             refreshDiscussionClassifications(metadata);
         }
-        vectorStoreService.upsert(id, updated.title(), updated.content(), metadata);
+
+        String embeddingContent = isArticle(metadata)
+                ? semanticSummaryService.summarizeDocumentForEmbedding(updated.title(), updated.content())
+                : updated.content();
+        vectorStoreService.upsert(id, updated.title(), embeddingContent, metadata);
     }
 
     public Document findById(long id) {
@@ -67,7 +78,8 @@ public class DocumentService {
     }
 
     public List<Document> semanticSearch(String query, String filterExpression) {
-        List<Long> ids = vectorStoreService.searchIds(query, 20, filterExpression);
+        String summarizedQuery = semanticSummaryService.summarizeQueryForSemanticSearch(query);
+        List<Long> ids = vectorStoreService.searchIds(summarizedQuery, 20, filterExpression);
         return repository.findByIds(ids);
     }
 
@@ -137,6 +149,10 @@ public class DocumentService {
 
     private boolean isDiscussion(Map<String, Object> properties) {
         return "discussion".equals(properties.get("sampleType"));
+    }
+
+    private boolean isArticle(Map<String, Object> properties) {
+        return "article".equals(properties.get("sampleType"));
     }
 
     private Long toLong(Object value) {
