@@ -138,10 +138,17 @@ public class PostgresDocumentRepository implements DocumentRepository {
                                d.updated_at,
                                CAST(dp.properties ->> 'respondsToDocumentId' AS BIGINT) AS parent_document_id,
                                dp.properties ->> 'discussionSection' AS discussion_section
-                        FROM documents d
-                        JOIN document_properties dp ON dp.document_id = d.id
-                        WHERE (dp.properties ->> 'sampleType') = 'discussion'
-                          AND CAST(dp.properties ->> 'relatedArticleDocumentId' AS BIGINT) = ?
+                        FROM documents article
+                        JOIN documents d ON d.id <> article.id
+                        LEFT JOIN document_properties dp ON dp.document_id = d.id
+                        WHERE article.id = ?
+                          AND (
+                              (
+                                  (dp.properties ->> 'sampleType') = 'discussion'
+                                  AND CAST(dp.properties ->> 'relatedArticleDocumentId' AS BIGINT) = article.id
+                              )
+                              OR d.title LIKE article.title || ' - Diskussion %'
+                          )
                         ORDER BY d.id
                         """,
                 (rs, rowNum) -> new DiscussionDocument(
