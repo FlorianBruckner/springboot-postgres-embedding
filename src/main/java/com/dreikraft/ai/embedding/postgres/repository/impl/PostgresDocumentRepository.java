@@ -22,7 +22,6 @@ import java.util.stream.Collectors;
 public class PostgresDocumentRepository implements DocumentRepository {
     private static final String TYPE_ARTICLE = "article";
     private static final String TYPE_DISCUSSION = "discussion";
-    private static final String TYPE_GENERIC = "generic";
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -34,28 +33,38 @@ public class PostgresDocumentRepository implements DocumentRepository {
     public long create(DocumentCreateRequest request) {
         Map<String, Object> properties = request.propertiesOrEmpty();
         String documentType = resolveDocumentType(properties);
-        Long articleDocumentId = toLong(properties.get("relatedArticleDocumentId"));
-        Long parentDocumentId = toLong(properties.get("respondsToDocumentId"));
-        String discussionSection = toStringValue(properties.get("discussionSection"));
-        String sentiment = TYPE_DISCUSSION.equals(documentType) ? "unknown" : null;
-        String responseDepth = TYPE_DISCUSSION.equals(documentType) ? "unknown" : null;
 
         Long id = jdbcTemplate.queryForObject(
                 """
-                        INSERT INTO documents (title, content, document_type, article_document_id, parent_document_id, discussion_section, sentiment, response_depth)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        INSERT INTO documents (title, content)
+                        VALUES (?, ?)
                         RETURNING id
                         """,
                 Long.class,
                 request.title(),
-                request.content(),
-                documentType,
-                articleDocumentId,
-                parentDocumentId,
-                discussionSection,
-                sentiment,
-                responseDepth
+                request.content()
         );
+
+        if (TYPE_ARTICLE.equals(documentType)) {
+            jdbcTemplate.update("INSERT INTO article_documents (document_id) VALUES (?)", id);
+        }
+
+        if (TYPE_DISCUSSION.equals(documentType)) {
+            Long articleDocumentId = toLong(properties.get("relatedArticleDocumentId"));
+            Long parentDocumentId = toLong(properties.get("respondsToDocumentId"));
+            String discussionSection = toStringValue(properties.get("discussionSection"));
+            jdbcTemplate.update(
+                    """
+                            INSERT INTO discussion_documents
+                                (document_id, article_document_id, parent_document_id, discussion_section, sentiment, response_depth)
+                            VALUES (?, ?, ?, ?, 'unknown', 'unknown')
+                            """,
+                    id,
+                    articleDocumentId,
+                    parentDocumentId,
+                    discussionSection
+            );
+        }
 
         return id;
     }
@@ -81,9 +90,9 @@ public class PostgresDocumentRepository implements DocumentRepository {
     public void updateDiscussionClassification(long id, String sentiment, String responseDepth) {
         int updated = jdbcTemplate.update(
                 """
-                        UPDATE documents
+                        UPDATE discussion_documents
                         SET sentiment = ?, response_depth = ?
-                        WHERE id = ?
+                        WHERE document_id = ?
                         """,
                 sentiment,
                 responseDepth,
@@ -106,7 +115,7 @@ public class PostgresDocumentRepository implements DocumentRepository {
         if (ids.isEmpty()) {
             return List.of();
         }
-        String placeholders = ids.stream().map(id -> "?").collect(Collectors.joining(","));
+        String placeholders = ids.stream().map(ignore -> "?").collect(Collectors.joining(","));
         List<Document> docs = jdbcTemplate.query(
                 "SELECT id, title, content, updated_at FROM documents WHERE id IN (" + placeholders + ")",
                 rowMapper(),
@@ -139,16 +148,19 @@ public class PostgresDocumentRepository implements DocumentRepository {
 
     @Override
     public List<Document> keywordSearchBySampleType(String term, int limit, String sampleType) {
+        if (!TYPE_ARTICLE.equals(sampleType)) {
+            return List.of();
+        }
         return jdbcTemplate.query(
                 """
-                        SELECT id, title, content, updated_at
-                        FROM documents
-                        WHERE document_type = ?
-                          AND to_tsvector('english', title || ' ' || content) @@ plainto_tsquery('english', ?)
-                        ORDER BY updated_at DESC
+                        SELECT d.id, d.title, d.content, d.updated_at
+                        FROM documents d
+                        JOIN article_documents a ON a.document_id = d.id
+                        WHERE to_tsvector('english', d.title || ' ' || d.content) @@ plainto_tsquery('english', ?)
+                        ORDER BY d.updated_at DESC
                         LIMIT ?
                         """,
-                rowMapper(), sampleType, term, limit
+                rowMapper(), term, limit
         );
     }
 
@@ -165,20 +177,19 @@ public class PostgresDocumentRepository implements DocumentRepository {
     private List<DiscussionDocument> findDiscussionsByArticleId(long articleDocumentId, boolean unclassifiedOnly) {
         return jdbcTemplate.query(
                 """
-                        SELECT id,
-                               title,
-                               content,
-                               updated_at,
-                               parent_document_id,
-                               discussion_section,
-                               sentiment,
-                               response_depth
-                        FROM documents
-                        WHERE document_type = 'discussion'
-                          AND article_document_id = ?
-                          AND (? = FALSE OR sentiment = 'unknown' OR response_depth = 'unknown'
-                               OR sentiment IS NULL OR response_depth IS NULL)
-                        ORDER BY id
+                        SELECT d.id,
+                               d.title,
+                               d.content,
+                               d.updated_at,
+                               dd.parent_document_id,
+                               dd.discussion_section,
+                               dd.sentiment,
+                               dd.response_depth
+                        FROM discussion_documents dd
+                        JOIN documents d ON d.id = dd.document_id
+                        WHERE dd.article_document_id = ?
+                          AND (? = FALSE OR dd.sentiment = 'unknown' OR dd.response_depth = 'unknown')
+                        ORDER BY d.id
                         """,
                 (rs, rowNum) -> new DiscussionDocument(
                         rs.getLong("id"),
@@ -199,13 +210,22 @@ public class PostgresDocumentRepository implements DocumentRepository {
     public Map<String, Object> findVectorMetadataById(long id) {
         return jdbcTemplate.query(
                         """
-                                SELECT document_type, article_document_id, parent_document_id, discussion_section
-                                FROM documents
-                                WHERE id = ?
+                                SELECT CASE
+                                           WHEN a.document_id IS NOT NULL THEN 'article'
+                                           WHEN dd.document_id IS NOT NULL THEN 'discussion'
+                                           ELSE 'generic'
+                                       END AS sample_type,
+                                       dd.article_document_id,
+                                       dd.parent_document_id,
+                                       dd.discussion_section
+                                FROM documents d
+                                LEFT JOIN article_documents a ON a.document_id = d.id
+                                LEFT JOIN discussion_documents dd ON dd.document_id = d.id
+                                WHERE d.id = ?
                                 """,
                         (rs, rowNum) -> {
                             Map<String, Object> metadata = new LinkedHashMap<>();
-                            metadata.put("sampleType", rs.getString("document_type"));
+                            metadata.put("sampleType", rs.getString("sample_type"));
 
                             Long articleId = rs.getObject("article_document_id", Long.class);
                             if (articleId != null) {
@@ -247,10 +267,10 @@ public class PostgresDocumentRepository implements DocumentRepository {
 
     private String resolveDocumentType(Map<String, Object> properties) {
         String typeFromProperties = toStringValue(properties.get("sampleType"));
-        if (TYPE_ARTICLE.equals(typeFromProperties) || TYPE_DISCUSSION.equals(typeFromProperties) || TYPE_GENERIC.equals(typeFromProperties)) {
+        if (TYPE_ARTICLE.equals(typeFromProperties) || TYPE_DISCUSSION.equals(typeFromProperties)) {
             return typeFromProperties;
         }
-        return properties.containsKey("relatedArticleDocumentId") ? TYPE_DISCUSSION : TYPE_GENERIC;
+        return properties.containsKey("relatedArticleDocumentId") ? TYPE_DISCUSSION : "generic";
     }
 
     private Long toLong(Object value) {
