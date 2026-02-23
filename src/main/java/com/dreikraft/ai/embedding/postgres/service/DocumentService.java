@@ -19,10 +19,14 @@ public class DocumentService {
 
     private final DocumentRepository repository;
     private final DocumentVectorStoreService vectorStoreService;
+    private final DiscussionClassificationService discussionClassificationService;
 
-    public DocumentService(DocumentRepository repository, DocumentVectorStoreService vectorStoreService) {
+    public DocumentService(DocumentRepository repository,
+                           DocumentVectorStoreService vectorStoreService,
+                           DiscussionClassificationService discussionClassificationService) {
         this.repository = repository;
         this.vectorStoreService = vectorStoreService;
+        this.discussionClassificationService = discussionClassificationService;
     }
 
     public long create(DocumentCreateRequest request) {
@@ -70,6 +74,14 @@ public class DocumentService {
             return List.of();
         }
 
+        Document article = findById(articleDocumentId);
+        Map<Long, DiscussionClassificationService.DiscussionClassification> classifications =
+                discussionClassificationService.classify(new DiscussionClassificationService.DiscussionClassificationInput(
+                        article.title(),
+                        article.content(),
+                        discussions
+                ));
+
         Map<Long, List<DiscussionDocument>> childrenByParent = new LinkedHashMap<>();
         for (DiscussionDocument discussion : discussions) {
             childrenByParent.computeIfAbsent(discussion.parentDocumentId(), ignored -> new ArrayList<>())
@@ -78,17 +90,24 @@ public class DocumentService {
         childrenByParent.values().forEach(children -> children.sort(Comparator.comparing(DiscussionDocument::id)));
 
         List<ThreadedDiscussionItem> threaded = new ArrayList<>();
-        appendThread(threaded, childrenByParent, null, 0);
+        appendThread(threaded, childrenByParent, classifications, null, 0);
         return threaded;
     }
 
     private void appendThread(List<ThreadedDiscussionItem> threaded,
                               Map<Long, List<DiscussionDocument>> childrenByParent,
+                              Map<Long, DiscussionClassificationService.DiscussionClassification> classifications,
                               Long parentDocumentId,
                               int depth) {
         for (DiscussionDocument child : childrenByParent.getOrDefault(parentDocumentId, List.of())) {
-            threaded.add(new ThreadedDiscussionItem(child, depth));
-            appendThread(threaded, childrenByParent, child.id(), depth + 1);
+            DiscussionClassificationService.DiscussionClassification classification = classifications.get(child.id());
+            threaded.add(new ThreadedDiscussionItem(
+                    child,
+                    depth,
+                    classification == null ? "neutral" : classification.sentiment(),
+                    classification == null ? "substantive" : classification.responseDepth()
+            ));
+            appendThread(threaded, childrenByParent, classifications, child.id(), depth + 1);
         }
     }
 }

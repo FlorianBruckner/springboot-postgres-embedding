@@ -46,7 +46,10 @@
                     <p class="meta"
                        th:text="${threaded.discussion.section != null and !#strings.isEmpty(threaded.discussion.section)
                        ? threaded.discussion.section
-                       : threaded.discussion.updatedAt}"></p>
+	                       : threaded.discussion.updatedAt}"></p>
+	                <p class="meta" th:text="'Sentiment: ' + ${threaded.sentiment}"></p>
+	                <p class="meta" th:if="${threaded.responseDepth != null}"
+	                   th:text="'Response depth: ' + ${threaded.responseDepth}"></p>                       
                     <p th:text="${threaded.discussion.content}"></p>
                 </div>
             </div>
