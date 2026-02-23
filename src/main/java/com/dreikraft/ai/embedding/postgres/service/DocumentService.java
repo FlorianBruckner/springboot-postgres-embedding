@@ -5,6 +5,7 @@ import com.dreikraft.ai.embedding.postgres.model.DocumentCreateRequest;
 import com.dreikraft.ai.embedding.postgres.model.DiscussionDocument;
 import com.dreikraft.ai.embedding.postgres.model.ThreadedDiscussionItem;
 import com.dreikraft.ai.embedding.postgres.repository.DocumentRepository;
+import org.springframework.core.task.TaskExecutor;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -21,22 +22,25 @@ public class DocumentService {
     private final DocumentVectorStoreService vectorStoreService;
     private final DiscussionClassificationService discussionClassificationService;
     private final SemanticSummaryService semanticSummaryService;
+    private final TaskExecutor taskExecutor;
 
     public DocumentService(DocumentRepository repository,
                            DocumentVectorStoreService vectorStoreService,
                            DiscussionClassificationService discussionClassificationService,
-                           SemanticSummaryService semanticSummaryService) {
+                           SemanticSummaryService semanticSummaryService,
+                           TaskExecutor taskExecutor) {
         this.repository = repository;
         this.vectorStoreService = vectorStoreService;
         this.discussionClassificationService = discussionClassificationService;
         this.semanticSummaryService = semanticSummaryService;
+        this.taskExecutor = taskExecutor;
     }
 
     public long create(DocumentCreateRequest request) {
         long id = repository.create(request);
         Map<String, Object> properties = request.propertiesOrEmpty();
         if (isDiscussion(properties)) {
-            refreshDiscussionClassifications(properties);
+            classifyUnclassifiedDiscussionsAsync(toLong(properties.get("relatedArticleDocumentId")));
         }
 
         String embeddingContent = isArticle(properties)
@@ -51,13 +55,21 @@ public class DocumentService {
         Document updated = findById(id);
         Map<String, Object> metadata = repository.findVectorMetadataById(id);
         if (isDiscussion(metadata)) {
-            refreshDiscussionClassifications(metadata);
+            classifyUnclassifiedDiscussionsAsync(toLong(metadata.get("relatedArticleDocumentId")));
         }
 
         String embeddingContent = isArticle(metadata)
                 ? semanticSummaryService.summarizeDocumentForEmbedding(updated.title(), updated.content())
                 : updated.content();
         vectorStoreService.upsert(id, updated.title(), embeddingContent, metadata);
+    }
+
+    public void classifyUnclassifiedDiscussionsAsync(Long articleDocumentId) {
+        if (articleDocumentId == null) {
+            return;
+        }
+
+        taskExecutor.execute(() -> refreshUnclassifiedDiscussionClassifications(articleDocumentId));
     }
 
     public Document findById(long id) {
@@ -113,20 +125,15 @@ public class DocumentService {
             threaded.add(new ThreadedDiscussionItem(
                     child,
                     depth,
-                    child.sentiment() == null ? "neutral" : child.sentiment(),
-                    child.responseDepth() == null ? "substantive" : child.responseDepth()
+                    child.sentiment() == null ? "unknown" : child.sentiment(),
+                    child.responseDepth() == null ? "unknown" : child.responseDepth()
             ));
             appendThread(threaded, childrenByParent, child.id(), depth + 1);
         }
     }
 
-    private void refreshDiscussionClassifications(Map<String, Object> properties) {
-        Long articleDocumentId = toLong(properties.get("relatedArticleDocumentId"));
-        if (articleDocumentId == null) {
-            return;
-        }
-
-        List<DiscussionDocument> discussions = repository.findDiscussionsByArticleId(articleDocumentId);
+    private void refreshUnclassifiedDiscussionClassifications(long articleDocumentId) {
+        List<DiscussionDocument> discussions = repository.findUnclassifiedDiscussionsByArticleId(articleDocumentId);
         if (discussions.isEmpty()) {
             return;
         }
@@ -141,8 +148,8 @@ public class DocumentService {
 
         for (DiscussionDocument discussion : discussions) {
             DiscussionClassificationService.DiscussionClassification classification = classifications.get(discussion.id());
-            String sentiment = classification == null ? "neutral" : classification.sentiment();
-            String responseDepth = classification == null ? "substantive" : classification.responseDepth();
+            String sentiment = classification == null ? "unknown" : classification.sentiment();
+            String responseDepth = classification == null ? "unknown" : classification.responseDepth();
             repository.updateDiscussionClassification(discussion.id(), sentiment, responseDepth);
         }
     }

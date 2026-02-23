@@ -98,6 +98,8 @@ public class SampleDataLoader implements ApplicationRunner {
                 ));
                 discussionIdToDocumentId.put(item.itemId(), discussionDocumentId);
             }
+
+            documentService.classifyUnclassifiedDiscussionsAsync(articleDocumentId);
         }
     }
 

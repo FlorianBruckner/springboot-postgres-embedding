@@ -6,6 +6,7 @@ import com.dreikraft.ai.embedding.postgres.model.DiscussionDocument;
 import com.dreikraft.ai.embedding.postgres.model.ThreadedDiscussionItem;
 import com.dreikraft.ai.embedding.postgres.repository.DocumentRepository;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.task.TaskExecutor;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -27,7 +28,8 @@ class DocumentServiceTest {
         DocumentVectorStoreService vectorStoreService = mock(DocumentVectorStoreService.class);
         DiscussionClassificationService classificationService = mock(DiscussionClassificationService.class);
         SemanticSummaryService semanticSummaryService = mock(SemanticSummaryService.class);
-        DocumentService service = new DocumentService(repository, vectorStoreService, classificationService, semanticSummaryService);
+        TaskExecutor taskExecutor = Runnable::run;
+        DocumentService service = new DocumentService(repository, vectorStoreService, classificationService, semanticSummaryService, taskExecutor);
 
         OffsetDateTime now = OffsetDateTime.now();
         DiscussionDocument root = new DiscussionDocument(10L, "Root", "Root message", now, null, "General", "neutral", "substantive");
@@ -46,16 +48,17 @@ class DocumentServiceTest {
     }
 
     @Test
-    void createDiscussionCalculatesAndPersistsClassification() {
+    void createDiscussionSchedulesAndPersistsClassificationForUnclassifiedItems() {
         DocumentRepository repository = mock(DocumentRepository.class);
         DocumentVectorStoreService vectorStoreService = mock(DocumentVectorStoreService.class);
         DiscussionClassificationService classificationService = mock(DiscussionClassificationService.class);
         SemanticSummaryService semanticSummaryService = mock(SemanticSummaryService.class);
-        DocumentService service = new DocumentService(repository, vectorStoreService, classificationService, semanticSummaryService);
+        TaskExecutor taskExecutor = Runnable::run;
+        DocumentService service = new DocumentService(repository, vectorStoreService, classificationService, semanticSummaryService, taskExecutor);
 
         OffsetDateTime now = OffsetDateTime.now();
-        DiscussionDocument root = new DiscussionDocument(10L, "Root", "Root message", now, null, "General", null, null);
-        DiscussionDocument reply = new DiscussionDocument(11L, "Reply", "Reply message", now, 10L, "General", null, null);
+        DiscussionDocument root = new DiscussionDocument(10L, "Root", "Root message", now, null, "General", "unknown", "unknown");
+        DiscussionDocument reply = new DiscussionDocument(11L, "Reply", "Reply message", now, 10L, "General", "unknown", "unknown");
 
         DocumentCreateRequest request = new DocumentCreateRequest(
                 "Reply",
@@ -64,7 +67,7 @@ class DocumentServiceTest {
         );
 
         when(repository.create(request)).thenReturn(11L);
-        when(repository.findDiscussionsByArticleId(1L)).thenReturn(List.of(root, reply));
+        when(repository.findUnclassifiedDiscussionsByArticleId(1L)).thenReturn(List.of(root, reply));
         when(repository.findById(1L)).thenReturn(Optional.of(new Document(1L, "Article", "Article content", now)));
         when(classificationService.classify(new DiscussionClassificationService.DiscussionClassificationInput(
                 "Article",
@@ -89,7 +92,8 @@ class DocumentServiceTest {
         DocumentVectorStoreService vectorStoreService = mock(DocumentVectorStoreService.class);
         DiscussionClassificationService classificationService = mock(DiscussionClassificationService.class);
         SemanticSummaryService semanticSummaryService = mock(SemanticSummaryService.class);
-        DocumentService service = new DocumentService(repository, vectorStoreService, classificationService, semanticSummaryService);
+        TaskExecutor taskExecutor = Runnable::run;
+        DocumentService service = new DocumentService(repository, vectorStoreService, classificationService, semanticSummaryService, taskExecutor);
 
         DocumentCreateRequest request = new DocumentCreateRequest(
                 "Java Streams",
@@ -113,7 +117,8 @@ class DocumentServiceTest {
         DocumentVectorStoreService vectorStoreService = mock(DocumentVectorStoreService.class);
         DiscussionClassificationService classificationService = mock(DiscussionClassificationService.class);
         SemanticSummaryService semanticSummaryService = mock(SemanticSummaryService.class);
-        DocumentService service = new DocumentService(repository, vectorStoreService, classificationService, semanticSummaryService);
+        TaskExecutor taskExecutor = Runnable::run;
+        DocumentService service = new DocumentService(repository, vectorStoreService, classificationService, semanticSummaryService, taskExecutor);
 
         when(semanticSummaryService.summarizeQueryForSemanticSearch("how streams work"))
                 .thenReturn("java streams basics");

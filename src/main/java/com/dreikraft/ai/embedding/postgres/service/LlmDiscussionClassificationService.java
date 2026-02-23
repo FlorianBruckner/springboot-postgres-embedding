@@ -16,6 +16,7 @@ import java.util.Map;
 public class LlmDiscussionClassificationService implements DiscussionClassificationService {
     private static final Logger log = LoggerFactory.getLogger(LlmDiscussionClassificationService.class);
     private static final String SENTIMENT_NEUTRAL = "neutral";
+    private static final String CLASSIFICATION_UNKNOWN = "unknown";
 
     private final ChatClient chatClient;
     private final ObjectMapper objectMapper;
@@ -32,6 +33,7 @@ public class LlmDiscussionClassificationService implements DiscussionClassificat
             return Map.of();
         }
 
+        String response = null;
         try {
             String inputJson = objectMapper.writeValueAsString(
                     discussions.stream()
@@ -39,7 +41,7 @@ public class LlmDiscussionClassificationService implements DiscussionClassificat
                             .toList()
             );
 
-            String response = chatClient.prompt()
+            response = chatClient.prompt()
                     .system("""
                             You classify online discussion entries for both sentiment and response depth.
 
@@ -83,14 +85,14 @@ public class LlmDiscussionClassificationService implements DiscussionClassificat
             }
 
             for (DiscussionDocument discussion : discussions) {
-                classifications.computeIfAbsent(discussion.id(), ignored -> fallback());
+                classifications.computeIfAbsent(discussion.id(), ignored -> unknownFallback());
             }
             return classifications;
         } catch (Exception ex) {
-            log.warn("Failed to classify discussion entries with LLM. Falling back to neutral defaults.", ex);
+            log.warn("Failed to classify discussion entries with LLM. Raw response: [{}]. Falling back to unknown defaults.", safeValue(response), ex);
             Map<Long, DiscussionClassification> fallback = new LinkedHashMap<>();
             for (DiscussionDocument discussion : discussions) {
-                fallback.put(discussion.id(), fallback());
+                fallback.put(discussion.id(), unknownFallback());
             }
             return fallback;
         }
@@ -100,8 +102,8 @@ public class LlmDiscussionClassificationService implements DiscussionClassificat
         return new PromptItem(discussion.id(), discussion.parentDocumentId(), discussion.content());
     }
 
-    private DiscussionClassification fallback() {
-        return new DiscussionClassification(SENTIMENT_NEUTRAL, "substantive");
+    private DiscussionClassification unknownFallback() {
+        return new DiscussionClassification(CLASSIFICATION_UNKNOWN, CLASSIFICATION_UNKNOWN);
     }
 
     private String normalizeSentiment(String value) {

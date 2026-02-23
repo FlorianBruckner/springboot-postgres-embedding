@@ -37,11 +37,13 @@ public class PostgresDocumentRepository implements DocumentRepository {
         Long articleDocumentId = toLong(properties.get("relatedArticleDocumentId"));
         Long parentDocumentId = toLong(properties.get("respondsToDocumentId"));
         String discussionSection = toStringValue(properties.get("discussionSection"));
+        String sentiment = TYPE_DISCUSSION.equals(documentType) ? "unknown" : null;
+        String responseDepth = TYPE_DISCUSSION.equals(documentType) ? "unknown" : null;
 
         Long id = jdbcTemplate.queryForObject(
                 """
-                        INSERT INTO documents (title, content, document_type, article_document_id, parent_document_id, discussion_section)
-                        VALUES (?, ?, ?, ?, ?, ?)
+                        INSERT INTO documents (title, content, document_type, article_document_id, parent_document_id, discussion_section, sentiment, response_depth)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                         RETURNING id
                         """,
                 Long.class,
@@ -50,7 +52,9 @@ public class PostgresDocumentRepository implements DocumentRepository {
                 documentType,
                 articleDocumentId,
                 parentDocumentId,
-                discussionSection
+                discussionSection,
+                sentiment,
+                responseDepth
         );
 
         return id;
@@ -150,6 +154,15 @@ public class PostgresDocumentRepository implements DocumentRepository {
 
     @Override
     public List<DiscussionDocument> findDiscussionsByArticleId(long articleDocumentId) {
+        return findDiscussionsByArticleId(articleDocumentId, false);
+    }
+
+    @Override
+    public List<DiscussionDocument> findUnclassifiedDiscussionsByArticleId(long articleDocumentId) {
+        return findDiscussionsByArticleId(articleDocumentId, true);
+    }
+
+    private List<DiscussionDocument> findDiscussionsByArticleId(long articleDocumentId, boolean unclassifiedOnly) {
         return jdbcTemplate.query(
                 """
                         SELECT id,
@@ -163,6 +176,8 @@ public class PostgresDocumentRepository implements DocumentRepository {
                         FROM documents
                         WHERE document_type = 'discussion'
                           AND article_document_id = ?
+                          AND (? = FALSE OR sentiment = 'unknown' OR response_depth = 'unknown'
+                               OR sentiment IS NULL OR response_depth IS NULL)
                         ORDER BY id
                         """,
                 (rs, rowNum) -> new DiscussionDocument(
@@ -175,7 +190,8 @@ public class PostgresDocumentRepository implements DocumentRepository {
                         rs.getString("sentiment"),
                         rs.getString("response_depth")
                 ),
-                articleDocumentId
+                articleDocumentId,
+                unclassifiedOnly
         );
     }
 

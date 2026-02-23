@@ -25,6 +25,8 @@ public interface DocumentRepository {
 
     List<DiscussionDocument> findDiscussionsByArticleId(long articleDocumentId);
 
+    List<DiscussionDocument> findUnclassifiedDiscussionsByArticleId(long articleDocumentId);
+
     Map<String, Object> findVectorMetadataById(long id);
 
     long count();
