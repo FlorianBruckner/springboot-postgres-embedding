@@ -38,16 +38,17 @@
         <p class="meta" th:text="${doc.updatedAt}"></p>
         <p th:text="${doc.content}"></p>
 
-        <div th:with="threadedDiscussions=${discussionsByArticleId.get(doc.id)}"
-             th:if="${threadedDiscussions != null and !#lists.isEmpty(threadedDiscussions)}">
-            <h4>Threaded discussions</h4>
-            <div th:each="threaded : ${threadedDiscussions}" class="discussion-item"
-                 th:style="'margin-left: ' + (${threaded.depth} * 1.25) + 'rem;'">
-                <p class="meta"
-                   th:text="${threaded.discussion.section} != null and !#strings.isEmpty(threaded.discussion.section)
-                   ? threaded.discussion.section
-                   : threaded.discussion.updatedAt"></p>
-                <p th:text="${threaded.discussion.content}"></p>
+        <div th:with="threadedDiscussions=${discussionsByArticleId.get(doc.id)}">
+            <div th:if="${threadedDiscussions != null and !#lists.isEmpty(threadedDiscussions)}">
+                <h4>Threaded discussions</h4>
+                <div th:each="threaded : ${threadedDiscussions}" class="discussion-item"
+                     th:style="'margin-left: ' + (${threaded.depth} * 1.25) + 'rem;'">
+                    <p class="meta"
+                       th:text="${threaded.discussion.section} != null and !#strings.isEmpty(threaded.discussion.section)
+                       ? threaded.discussion.section
+                       : threaded.discussion.updatedAt"></p>
+                    <p th:text="${threaded.discussion.content}"></p>
+                </div>
             </div>
         </div>
     </div>
