@@ -2,8 +2,7 @@ package com.dreikraft.ai.embedding.postgres.service;
 
 import com.dreikraft.ai.embedding.postgres.model.DocumentCreateRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -20,9 +19,9 @@ import java.util.Map;
 
 @Component
 @ConditionalOnProperty(prefix = "sample-loader", name = "enabled", havingValue = "true", matchIfMissing = true)
+@Slf4j
 public class SampleDataLoader implements ApplicationRunner {
     private static final int SAMPLE_SIZE = 1000;
-    private static final Logger log = LoggerFactory.getLogger(SampleDataLoader.class);
 
     private final DocumentService documentService;
     private final WikipediaClient wikipediaClient;
@@ -45,20 +44,29 @@ public class SampleDataLoader implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         if (documentService.count() > 0) {
+            log.info("Skipping sample data loading because documents already exist.");
             return;
         }
 
+        log.info("Starting sample data loading process.");
         CachedSampleData cachedSampleData = loadPersistedData();
         if (cachedSampleData.articleBundles().isEmpty()) {
+            log.info("No cached sample data found. Fetching fresh sample data from Wikipedia.");
             cachedSampleData = fetchAndBuildSampleData();
             persistSampleData(cachedSampleData);
         }
 
         persistDocuments(cachedSampleData);
+        log.info("Sample data loading completed. Persisted {} article bundles.", cachedSampleData.articleBundles().size());
     }
 
     private void persistDocuments(CachedSampleData cachedSampleData) {
+        int totalBundles = cachedSampleData.articleBundles().size();
+        int processedBundles = 0;
+
         for (CachedArticleBundle articleBundle : cachedSampleData.articleBundles()) {
+            processedBundles++;
+            log.info("Persisting article bundle {}/{}: {}", processedBundles, totalBundles, articleBundle.article().title());
             long articleDocumentId = documentService.create(new DocumentCreateRequest(
                     articleBundle.article().title(),
                     articleBundle.article().extract(),
@@ -66,6 +74,7 @@ public class SampleDataLoader implements ApplicationRunner {
             ));
 
             Map<String, Long> discussionIdToDocumentId = new HashMap<>();
+            log.info("Persisting {} discussion items for article '{}'", articleBundle.discussionItems().size(), articleBundle.article().title());
             for (WikipediaClient.WikipediaDiscussionItem item : articleBundle.discussionItems()) {
                 Map<String, Object> properties = new HashMap<>();
                 properties.put("sampleType", "discussion");
@@ -93,14 +102,20 @@ public class SampleDataLoader implements ApplicationRunner {
     }
 
     private CachedSampleData fetchAndBuildSampleData() {
+        log.info("Fetching {} random German Wikipedia articles.", SAMPLE_SIZE);
         List<WikipediaClient.WikipediaArticle> articles = wikipediaClient.fetchRandomGermanArticles(SAMPLE_SIZE);
         List<CachedArticleBundle> bundles = new ArrayList<>();
 
+        int articleCount = articles.size();
+        int processedArticles = 0;
         for (WikipediaClient.WikipediaArticle article : articles) {
+            processedArticles++;
+            log.info("Fetching discussion items for article {}/{}: {}", processedArticles, articleCount, article.title());
             List<WikipediaClient.WikipediaDiscussionItem> discussionItems = wikipediaClient.fetchDiscussionItems(article.title());
             bundles.add(new CachedArticleBundle(article, discussionItems));
         }
 
+        log.info("Finished fetching sample data. Built {} article bundles.", bundles.size());
         return new CachedSampleData(bundles);
     }
 
