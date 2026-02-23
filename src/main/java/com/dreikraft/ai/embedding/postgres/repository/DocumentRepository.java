@@ -13,6 +13,8 @@ public interface DocumentRepository {
 
     void update(long id, String content);
 
+    void updateDiscussionClassification(long id, String sentiment, String responseDepth);
+
     Optional<Document> findById(long id);
 
     List<Document> findByIds(List<Long> ids);
