@@ -31,7 +31,11 @@ public class DocumentService {
 
     public long create(DocumentCreateRequest request) {
         long id = repository.create(request);
-        vectorStoreService.upsert(id, request.title(), request.content(), request.propertiesOrEmpty());
+        Map<String, Object> properties = request.propertiesOrEmpty();
+        if (isDiscussion(properties)) {
+            refreshDiscussionClassifications(properties);
+        }
+        vectorStoreService.upsert(id, request.title(), request.content(), properties);
         return id;
     }
 
@@ -39,6 +43,9 @@ public class DocumentService {
         repository.update(id, content);
         Document updated = findById(id);
         Map<String, Object> metadata = repository.findVectorMetadataById(id);
+        if (isDiscussion(metadata)) {
+            refreshDiscussionClassifications(metadata);
+        }
         vectorStoreService.upsert(id, updated.title(), updated.content(), metadata);
     }
 
@@ -74,14 +81,6 @@ public class DocumentService {
             return List.of();
         }
 
-        Document article = findById(articleDocumentId);
-        Map<Long, DiscussionClassificationService.DiscussionClassification> classifications =
-                discussionClassificationService.classify(new DiscussionClassificationService.DiscussionClassificationInput(
-                        article.title(),
-                        article.content(),
-                        discussions
-                ));
-
         Map<Long, List<DiscussionDocument>> childrenByParent = new LinkedHashMap<>();
         for (DiscussionDocument discussion : discussions) {
             childrenByParent.computeIfAbsent(discussion.parentDocumentId(), ignored -> new ArrayList<>())
@@ -90,24 +89,63 @@ public class DocumentService {
         childrenByParent.values().forEach(children -> children.sort(Comparator.comparing(DiscussionDocument::id)));
 
         List<ThreadedDiscussionItem> threaded = new ArrayList<>();
-        appendThread(threaded, childrenByParent, classifications, null, 0);
+        appendThread(threaded, childrenByParent, null, 0);
         return threaded;
     }
 
     private void appendThread(List<ThreadedDiscussionItem> threaded,
                               Map<Long, List<DiscussionDocument>> childrenByParent,
-                              Map<Long, DiscussionClassificationService.DiscussionClassification> classifications,
                               Long parentDocumentId,
                               int depth) {
         for (DiscussionDocument child : childrenByParent.getOrDefault(parentDocumentId, List.of())) {
-            DiscussionClassificationService.DiscussionClassification classification = classifications.get(child.id());
             threaded.add(new ThreadedDiscussionItem(
                     child,
                     depth,
-                    classification == null ? "neutral" : classification.sentiment(),
-                    classification == null ? "substantive" : classification.responseDepth()
+                    child.sentiment() == null ? "neutral" : child.sentiment(),
+                    child.responseDepth() == null ? "substantive" : child.responseDepth()
             ));
-            appendThread(threaded, childrenByParent, classifications, child.id(), depth + 1);
+            appendThread(threaded, childrenByParent, child.id(), depth + 1);
         }
+    }
+
+    private void refreshDiscussionClassifications(Map<String, Object> properties) {
+        Long articleDocumentId = toLong(properties.get("relatedArticleDocumentId"));
+        if (articleDocumentId == null) {
+            return;
+        }
+
+        List<DiscussionDocument> discussions = repository.findDiscussionsByArticleId(articleDocumentId);
+        if (discussions.isEmpty()) {
+            return;
+        }
+
+        Document article = findById(articleDocumentId);
+        Map<Long, DiscussionClassificationService.DiscussionClassification> classifications =
+                discussionClassificationService.classify(new DiscussionClassificationService.DiscussionClassificationInput(
+                        article.title(),
+                        article.content(),
+                        discussions
+                ));
+
+        for (DiscussionDocument discussion : discussions) {
+            DiscussionClassificationService.DiscussionClassification classification = classifications.get(discussion.id());
+            String sentiment = classification == null ? "neutral" : classification.sentiment();
+            String responseDepth = classification == null ? "substantive" : classification.responseDepth();
+            repository.updateDiscussionClassification(discussion.id(), sentiment, responseDepth);
+        }
+    }
+
+    private boolean isDiscussion(Map<String, Object> properties) {
+        return "discussion".equals(properties.get("sampleType"));
+    }
+
+    private Long toLong(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        return Long.parseLong(value.toString());
     }
 }
