@@ -4,8 +4,6 @@ import com.dreikraft.ai.embedding.postgres.model.Document;
 import com.dreikraft.ai.embedding.postgres.model.DocumentCreateRequest;
 import com.dreikraft.ai.embedding.postgres.model.DiscussionDocument;
 import com.dreikraft.ai.embedding.postgres.repository.DocumentRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -13,6 +11,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -21,35 +20,39 @@ import java.util.stream.Collectors;
 @Repository
 @ConditionalOnProperty(prefix = "app.database", name = "vendor", havingValue = "postgres", matchIfMissing = true)
 public class PostgresDocumentRepository implements DocumentRepository {
-    private final JdbcTemplate jdbcTemplate;
-    private final ObjectMapper objectMapper;
+    private static final String TYPE_ARTICLE = "article";
+    private static final String TYPE_DISCUSSION = "discussion";
+    private static final String TYPE_GENERIC = "generic";
 
-    public PostgresDocumentRepository(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
+    private final JdbcTemplate jdbcTemplate;
+
+    public PostgresDocumentRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
-        this.objectMapper = objectMapper;
     }
 
     @Override
     public long create(DocumentCreateRequest request) {
+        Map<String, Object> properties = request.propertiesOrEmpty();
+        String documentType = resolveDocumentType(properties);
+        Long articleDocumentId = toLong(properties.get("relatedArticleDocumentId"));
+        Long parentDocumentId = toLong(properties.get("respondsToDocumentId"));
+        String discussionSection = toStringValue(properties.get("discussionSection"));
+
         Long id = jdbcTemplate.queryForObject(
                 """
-                        INSERT INTO documents (title, content)
-                        VALUES (?, ?)
+                        INSERT INTO documents (title, content, document_type, article_document_id, parent_document_id, discussion_section)
+                        VALUES (?, ?, ?, ?, ?, ?)
                         RETURNING id
                         """,
                 Long.class,
                 request.title(),
-                request.content()
+                request.content(),
+                documentType,
+                articleDocumentId,
+                parentDocumentId,
+                discussionSection
         );
-        jdbcTemplate.update(
-                """
-                        INSERT INTO document_properties (document_id, properties)
-                        VALUES (?, CAST(? AS JSONB))
-                        ON CONFLICT (document_id) DO UPDATE SET properties = EXCLUDED.properties
-                        """,
-                id,
-                toJson(request.propertiesOrEmpty())
-        );
+
         return id;
     }
 
@@ -116,12 +119,11 @@ public class PostgresDocumentRepository implements DocumentRepository {
     public List<Document> keywordSearchBySampleType(String term, int limit, String sampleType) {
         return jdbcTemplate.query(
                 """
-                        SELECT d.id, d.title, d.content, d.updated_at
-                        FROM documents d
-                        JOIN document_properties dp ON dp.document_id = d.id
-                        WHERE (dp.properties ->> 'sampleType') = ?
-                          AND to_tsvector('english', d.title || ' ' || d.content) @@ plainto_tsquery('english', ?)
-                        ORDER BY d.updated_at DESC
+                        SELECT id, title, content, updated_at
+                        FROM documents
+                        WHERE document_type = ?
+                          AND to_tsvector('english', title || ' ' || content) @@ plainto_tsquery('english', ?)
+                        ORDER BY updated_at DESC
                         LIMIT ?
                         """,
                 rowMapper(), sampleType, term, limit
@@ -132,24 +134,16 @@ public class PostgresDocumentRepository implements DocumentRepository {
     public List<DiscussionDocument> findDiscussionsByArticleId(long articleDocumentId) {
         return jdbcTemplate.query(
                 """
-                        SELECT d.id,
-                               d.title,
-                               d.content,
-                               d.updated_at,
-                               CAST(dp.properties ->> 'respondsToDocumentId' AS BIGINT) AS parent_document_id,
-                               dp.properties ->> 'discussionSection' AS discussion_section
-                        FROM documents article
-                        JOIN documents d ON d.id <> article.id
-                        LEFT JOIN document_properties dp ON dp.document_id = d.id
-                        WHERE article.id = ?
-                          AND (
-                              (
-                                  (dp.properties ->> 'sampleType') = 'discussion'
-                                  AND CAST(dp.properties ->> 'relatedArticleDocumentId' AS BIGINT) = article.id
-                              )
-                              OR d.title LIKE article.title || ' - Diskussion %'
-                          )
-                        ORDER BY d.id
+                        SELECT id,
+                               title,
+                               content,
+                               updated_at,
+                               parent_document_id,
+                               discussion_section
+                        FROM documents
+                        WHERE document_type = 'discussion'
+                          AND article_document_id = ?
+                        ORDER BY id
                         """,
                 (rs, rowNum) -> new DiscussionDocument(
                         rs.getLong("id"),
@@ -161,6 +155,42 @@ public class PostgresDocumentRepository implements DocumentRepository {
                 ),
                 articleDocumentId
         );
+    }
+
+    @Override
+    public Map<String, Object> findVectorMetadataById(long id) {
+        return jdbcTemplate.query(
+                        """
+                                SELECT document_type, article_document_id, parent_document_id, discussion_section
+                                FROM documents
+                                WHERE id = ?
+                                """,
+                        (rs, rowNum) -> {
+                            Map<String, Object> metadata = new LinkedHashMap<>();
+                            metadata.put("sampleType", rs.getString("document_type"));
+
+                            Long articleId = rs.getObject("article_document_id", Long.class);
+                            if (articleId != null) {
+                                metadata.put("relatedArticleDocumentId", articleId);
+                            }
+
+                            Long parentId = rs.getObject("parent_document_id", Long.class);
+                            if (parentId != null) {
+                                metadata.put("respondsToDocumentId", parentId);
+                            }
+
+                            String section = rs.getString("discussion_section");
+                            if (section != null && !section.isBlank()) {
+                                metadata.put("discussionSection", section);
+                            }
+
+                            return metadata;
+                        },
+                        id
+                )
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Document not found: " + id));
     }
 
     @Override
@@ -177,11 +207,25 @@ public class PostgresDocumentRepository implements DocumentRepository {
         );
     }
 
-    private String toJson(Map<String, Object> properties) {
-        try {
-            return objectMapper.writeValueAsString(properties);
-        } catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("Unable to serialize properties", e);
+    private String resolveDocumentType(Map<String, Object> properties) {
+        String typeFromProperties = toStringValue(properties.get("sampleType"));
+        if (TYPE_ARTICLE.equals(typeFromProperties) || TYPE_DISCUSSION.equals(typeFromProperties) || TYPE_GENERIC.equals(typeFromProperties)) {
+            return typeFromProperties;
         }
+        return properties.containsKey("relatedArticleDocumentId") ? TYPE_DISCUSSION : TYPE_GENERIC;
+    }
+
+    private Long toLong(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        return Long.parseLong(value.toString());
+    }
+
+    private String toStringValue(Object value) {
+        return value == null ? null : value.toString();
     }
 }

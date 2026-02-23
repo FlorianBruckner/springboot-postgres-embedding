@@ -12,6 +12,13 @@ import java.util.Map;
 
 @Service
 public class DocumentVectorStoreService {
+    private static final List<String> ALLOWED_METADATA_KEYS = List.of(
+            "sampleType",
+            "relatedArticleDocumentId",
+            "respondsToDocumentId",
+            "discussionSection"
+    );
+
     private final VectorStore vectorStore;
     private final double similarityThreshold;
 
@@ -26,7 +33,12 @@ public class DocumentVectorStoreService {
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("title", title);
         if (additionalProperties != null) {
-            metadata.putAll(additionalProperties);
+            for (String key : ALLOWED_METADATA_KEYS) {
+                Object value = additionalProperties.get(key);
+                if (value != null) {
+                    metadata.put(key, value);
+                }
+            }
         }
 
         Document document = new Document(Long.toString(id), content, metadata);

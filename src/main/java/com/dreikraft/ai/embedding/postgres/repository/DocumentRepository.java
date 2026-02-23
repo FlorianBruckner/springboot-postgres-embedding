@@ -5,6 +5,7 @@ import com.dreikraft.ai.embedding.postgres.model.DocumentCreateRequest;
 import com.dreikraft.ai.embedding.postgres.model.DiscussionDocument;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public interface DocumentRepository {
@@ -21,6 +22,8 @@ public interface DocumentRepository {
     List<Document> keywordSearchBySampleType(String term, int limit, String sampleType);
 
     List<DiscussionDocument> findDiscussionsByArticleId(long articleDocumentId);
+
+    Map<String, Object> findVectorMetadataById(long id);
 
     long count();
 

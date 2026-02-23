@@ -34,7 +34,8 @@ public class DocumentService {
     public void update(long id, String content) {
         repository.update(id, content);
         Document updated = findById(id);
-        vectorStoreService.upsert(id, updated.title(), updated.content(), null);
+        Map<String, Object> metadata = repository.findVectorMetadataById(id);
+        vectorStoreService.upsert(id, updated.title(), updated.content(), metadata);
     }
 
     public Document findById(long id) {
@@ -51,7 +52,7 @@ public class DocumentService {
     }
 
     public List<Document> semanticSearch(String query) {
-        return semanticSearch(query, null);
+        return semanticSearch(query, ARTICLE_FILTER_EXPRESSION);
     }
 
     public List<Document> semanticSearch(String query, String filterExpression) {
