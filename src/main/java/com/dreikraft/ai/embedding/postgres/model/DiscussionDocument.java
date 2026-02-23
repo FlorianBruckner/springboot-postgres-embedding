@@ -8,6 +8,8 @@ public record DiscussionDocument(
         String content,
         OffsetDateTime updatedAt,
         Long parentDocumentId,
-        String section
+        String section,
+        String sentiment,
+        String responseDepth
 ) {
 }

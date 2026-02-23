@@ -1,0 +1,3 @@
+ALTER TABLE documents
+    ADD COLUMN IF NOT EXISTS sentiment VARCHAR(32),
+    ADD COLUMN IF NOT EXISTS response_depth VARCHAR(32);

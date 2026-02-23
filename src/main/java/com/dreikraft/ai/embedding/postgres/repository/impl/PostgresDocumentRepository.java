@@ -72,6 +72,24 @@ public class PostgresDocumentRepository implements DocumentRepository {
         }
     }
 
+
+    @Override
+    public void updateDiscussionClassification(long id, String sentiment, String responseDepth) {
+        int updated = jdbcTemplate.update(
+                """
+                        UPDATE documents
+                        SET sentiment = ?, response_depth = ?
+                        WHERE id = ?
+                        """,
+                sentiment,
+                responseDepth,
+                id
+        );
+        if (updated == 0) {
+            throw new IllegalArgumentException("Document not found: " + id);
+        }
+    }
+
     @Override
     public Optional<Document> findById(long id) {
         return jdbcTemplate.query("SELECT id, title, content, updated_at FROM documents WHERE id = ?", rowMapper(), id)
@@ -139,7 +157,9 @@ public class PostgresDocumentRepository implements DocumentRepository {
                                content,
                                updated_at,
                                parent_document_id,
-                               discussion_section
+                               discussion_section,
+                               sentiment,
+                               response_depth
                         FROM documents
                         WHERE document_type = 'discussion'
                           AND article_document_id = ?
@@ -151,7 +171,9 @@ public class PostgresDocumentRepository implements DocumentRepository {
                         rs.getString("content"),
                         rs.getObject("updated_at", OffsetDateTime.class),
                         rs.getObject("parent_document_id", Long.class),
-                        rs.getString("discussion_section")
+                        rs.getString("discussion_section"),
+                        rs.getString("sentiment"),
+                        rs.getString("response_depth")
                 ),
                 articleDocumentId
         );

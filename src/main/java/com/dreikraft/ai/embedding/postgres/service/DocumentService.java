@@ -19,15 +19,30 @@ public class DocumentService {
 
     private final DocumentRepository repository;
     private final DocumentVectorStoreService vectorStoreService;
+    private final DiscussionClassificationService discussionClassificationService;
+    private final SemanticSummaryService semanticSummaryService;
 
-    public DocumentService(DocumentRepository repository, DocumentVectorStoreService vectorStoreService) {
+    public DocumentService(DocumentRepository repository,
+                           DocumentVectorStoreService vectorStoreService,
+                           DiscussionClassificationService discussionClassificationService,
+                           SemanticSummaryService semanticSummaryService) {
         this.repository = repository;
         this.vectorStoreService = vectorStoreService;
+        this.discussionClassificationService = discussionClassificationService;
+        this.semanticSummaryService = semanticSummaryService;
     }
 
     public long create(DocumentCreateRequest request) {
         long id = repository.create(request);
-        vectorStoreService.upsert(id, request.title(), request.content(), request.propertiesOrEmpty());
+        Map<String, Object> properties = request.propertiesOrEmpty();
+        if (isDiscussion(properties)) {
+            refreshDiscussionClassifications(properties);
+        }
+
+        String embeddingContent = isArticle(properties)
+                ? semanticSummaryService.summarizeDocumentForEmbedding(request.title(), request.content())
+                : request.content();
+        vectorStoreService.upsert(id, request.title(), embeddingContent, properties);
         return id;
     }
 
@@ -35,7 +50,14 @@ public class DocumentService {
         repository.update(id, content);
         Document updated = findById(id);
         Map<String, Object> metadata = repository.findVectorMetadataById(id);
-        vectorStoreService.upsert(id, updated.title(), updated.content(), metadata);
+        if (isDiscussion(metadata)) {
+            refreshDiscussionClassifications(metadata);
+        }
+
+        String embeddingContent = isArticle(metadata)
+                ? semanticSummaryService.summarizeDocumentForEmbedding(updated.title(), updated.content())
+                : updated.content();
+        vectorStoreService.upsert(id, updated.title(), embeddingContent, metadata);
     }
 
     public Document findById(long id) {
@@ -56,7 +78,8 @@ public class DocumentService {
     }
 
     public List<Document> semanticSearch(String query, String filterExpression) {
-        List<Long> ids = vectorStoreService.searchIds(query, 20, filterExpression);
+        String summarizedQuery = semanticSummaryService.summarizeQueryForSemanticSearch(query);
+        List<Long> ids = vectorStoreService.searchIds(summarizedQuery, 20, filterExpression);
         return repository.findByIds(ids);
     }
 
@@ -87,8 +110,58 @@ public class DocumentService {
                               Long parentDocumentId,
                               int depth) {
         for (DiscussionDocument child : childrenByParent.getOrDefault(parentDocumentId, List.of())) {
-            threaded.add(new ThreadedDiscussionItem(child, depth));
+            threaded.add(new ThreadedDiscussionItem(
+                    child,
+                    depth,
+                    child.sentiment() == null ? "neutral" : child.sentiment(),
+                    child.responseDepth() == null ? "substantive" : child.responseDepth()
+            ));
             appendThread(threaded, childrenByParent, child.id(), depth + 1);
         }
+    }
+
+    private void refreshDiscussionClassifications(Map<String, Object> properties) {
+        Long articleDocumentId = toLong(properties.get("relatedArticleDocumentId"));
+        if (articleDocumentId == null) {
+            return;
+        }
+
+        List<DiscussionDocument> discussions = repository.findDiscussionsByArticleId(articleDocumentId);
+        if (discussions.isEmpty()) {
+            return;
+        }
+
+        Document article = findById(articleDocumentId);
+        Map<Long, DiscussionClassificationService.DiscussionClassification> classifications =
+                discussionClassificationService.classify(new DiscussionClassificationService.DiscussionClassificationInput(
+                        article.title(),
+                        article.content(),
+                        discussions
+                ));
+
+        for (DiscussionDocument discussion : discussions) {
+            DiscussionClassificationService.DiscussionClassification classification = classifications.get(discussion.id());
+            String sentiment = classification == null ? "neutral" : classification.sentiment();
+            String responseDepth = classification == null ? "substantive" : classification.responseDepth();
+            repository.updateDiscussionClassification(discussion.id(), sentiment, responseDepth);
+        }
+    }
+
+    private boolean isDiscussion(Map<String, Object> properties) {
+        return "discussion".equals(properties.get("sampleType"));
+    }
+
+    private boolean isArticle(Map<String, Object> properties) {
+        return "article".equals(properties.get("sampleType"));
+    }
+
+    private Long toLong(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        return Long.parseLong(value.toString());
     }
 }
