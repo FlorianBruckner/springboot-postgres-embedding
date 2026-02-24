@@ -19,10 +19,10 @@ import static org.mockito.Mockito.when;
 class DocumentVectorStoreServiceTest {
 
     @Test
-    void searchUsesConfiguredSimilarityThreshold() {
+    void searchUsesConfiguredSimilarityThresholdAndEntityMetadata() {
         VectorStore vectorStore = mock(VectorStore.class);
         Document result = mock(Document.class);
-        when(result.getId()).thenReturn("42");
+        when(result.getMetadata()).thenReturn(Map.of("entityId", 42L));
         when(vectorStore.similaritySearch(any(SearchRequest.class)))
                 .thenReturn(List.of(result));
 
@@ -37,7 +37,7 @@ class DocumentVectorStoreServiceTest {
     }
 
     @Test
-    void upsertKeepsOnlyMetadataUsedForVectorQueries() {
+    void upsertKeepsOnlyMetadataUsedForVectorQueriesAndStoresEntityReference() {
         VectorStore vectorStore = mock(VectorStore.class);
         DocumentVectorStoreService service = new DocumentVectorStoreService(vectorStore, 0.75);
 
@@ -51,8 +51,11 @@ class DocumentVectorStoreServiceTest {
         verify(vectorStore).add(addedDocumentsCaptor.capture());
         Document added = addedDocumentsCaptor.getValue().getFirst();
 
+        assertEquals("article:7:0", added.getId());
         assertEquals("article", added.getMetadata().get("sampleType"));
         assertEquals(1L, added.getMetadata().get("relatedArticleDocumentId"));
+        assertEquals(7L, added.getMetadata().get("entityId"));
+        assertEquals("article", added.getMetadata().get("entityType"));
         assertFalse(added.getMetadata().containsKey("discussionItemId"));
     }
 }

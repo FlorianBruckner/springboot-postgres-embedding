@@ -1,6 +1,6 @@
 package com.dreikraft.ai.embedding.postgres.service;
 
-import com.dreikraft.ai.embedding.postgres.model.Document;
+import com.dreikraft.ai.embedding.postgres.model.ArticleDocument;
 import com.dreikraft.ai.embedding.postgres.model.DocumentCreateRequest;
 import com.dreikraft.ai.embedding.postgres.model.DiscussionDocument;
 import com.dreikraft.ai.embedding.postgres.model.ThreadedDiscussionItem;
@@ -48,7 +48,7 @@ public class DocumentService {
 
     public void update(long id, String content) {
         repository.update(id, content);
-        Document updated = findById(id);
+        ArticleDocument updated = findById(id);
         Map<String, Object> metadata = repository.findVectorMetadataById(id);
         if (isDiscussion(metadata)) {
             refreshDiscussionClassifications(metadata);
@@ -60,24 +60,24 @@ public class DocumentService {
         vectorStoreService.upsert(id, updated.title(), embeddingContent, metadata);
     }
 
-    public Document findById(long id) {
+    public ArticleDocument findById(long id) {
         return repository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Document not found: " + id));
     }
 
-    public List<Document> keywordSearch(String term) {
+    public List<ArticleDocument> keywordSearch(String term) {
         return repository.keywordSearch(term, 20);
     }
 
-    public List<Document> keywordArticleSearch(String term) {
+    public List<ArticleDocument> keywordArticleSearch(String term) {
         return repository.keywordSearchBySampleType(term, 20, "article");
     }
 
-    public List<Document> semanticSearch(String query) {
+    public List<ArticleDocument> semanticSearch(String query) {
         return semanticSearch(query, ARTICLE_FILTER_EXPRESSION);
     }
 
-    public List<Document> semanticSearch(String query, String filterExpression) {
+    public List<ArticleDocument> semanticSearch(String query, String filterExpression) {
         String summarizedQuery = semanticSummaryService.summarizeQueryForSemanticSearch(query);
         List<Long> ids = vectorStoreService.searchIds(summarizedQuery, 20, filterExpression);
         return repository.findByIds(ids);
@@ -131,7 +131,7 @@ public class DocumentService {
             return;
         }
 
-        Document article = findById(articleDocumentId);
+        ArticleDocument article = findById(articleDocumentId);
         Map<Long, DiscussionClassificationService.DiscussionClassification> classifications =
                 discussionClassificationService.classify(new DiscussionClassificationService.DiscussionClassificationInput(
                         article.title(),

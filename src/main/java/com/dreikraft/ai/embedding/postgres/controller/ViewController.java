@@ -1,6 +1,6 @@
 package com.dreikraft.ai.embedding.postgres.controller;
 
-import com.dreikraft.ai.embedding.postgres.model.Document;
+import com.dreikraft.ai.embedding.postgres.model.ArticleDocument;
 import com.dreikraft.ai.embedding.postgres.model.ThreadedDiscussionItem;
 import com.dreikraft.ai.embedding.postgres.service.DocumentService;
 import com.dreikraft.ai.embedding.postgres.service.RagService;
@@ -30,7 +30,7 @@ public class ViewController {
         model.addAttribute("query", q == null ? "" : q);
         model.addAttribute("mode", mode);
         if (q != null && !q.isBlank()) {
-            List<Document> results;
+            List<ArticleDocument> results;
             if ("rag".equals(mode)) {
                 model.addAttribute("ragAnswer", ragService.answer(q));
                 results = documentService.semanticSearch(q, DocumentService.ARTICLE_FILTER_EXPRESSION);
@@ -42,7 +42,7 @@ public class ViewController {
             model.addAttribute("results", results);
 
             Map<Long, List<ThreadedDiscussionItem>> discussionsByArticleId = new LinkedHashMap<>();
-            for (Document article : results) {
+            for (ArticleDocument article : results) {
                 discussionsByArticleId.put(article.id(), documentService.findThreadedDiscussionsByArticleId(article.id()));
             }
             model.addAttribute("discussionsByArticleId", discussionsByArticleId);

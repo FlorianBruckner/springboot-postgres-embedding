@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -18,6 +19,9 @@ public class DocumentVectorStoreService {
             "respondsToDocumentId",
             "discussionSection"
     );
+
+    private static final String ENTITY_ID_KEY = "entityId";
+    private static final String ENTITY_TYPE_KEY = "entityType";
 
     private final VectorStore vectorStore;
     private final double similarityThreshold;
@@ -32,6 +36,8 @@ public class DocumentVectorStoreService {
     public void upsert(long id, String title, String content, Map<String, Object> additionalProperties) {
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("title", title);
+
+        String sampleType = "generic";
         if (additionalProperties != null) {
             for (String key : ALLOWED_METADATA_KEYS) {
                 Object value = additionalProperties.get(key);
@@ -39,9 +45,17 @@ public class DocumentVectorStoreService {
                     metadata.put(key, value);
                 }
             }
+            Object rawType = additionalProperties.get("sampleType");
+            if (rawType != null && !rawType.toString().isBlank()) {
+                sampleType = rawType.toString();
+            }
         }
 
-        Document document = new Document(Long.toString(id), content, metadata);
+        metadata.put(ENTITY_ID_KEY, id);
+        metadata.put(ENTITY_TYPE_KEY, sampleType);
+
+        String vectorDocumentId = sampleType + ":" + id + ":0";
+        Document document = new Document(vectorDocumentId, content, metadata);
         vectorStore.add(List.of(document));
     }
 
@@ -56,11 +70,23 @@ public class DocumentVectorStoreService {
 
         return vectorStore.similaritySearch(builder.build())
                 .stream()
-                .map(doc -> Long.valueOf(doc.getId()))
-                .toList();
+                .map(doc -> doc.getMetadata().get(ENTITY_ID_KEY))
+                .filter(java.util.Objects::nonNull)
+                .map(this::toLong)
+                .collect(java.util.stream.Collectors.collectingAndThen(
+                        java.util.stream.Collectors.toCollection(LinkedHashSet::new),
+                        List::copyOf
+                ));
     }
 
     public void delete(long id) {
-        vectorStore.delete(List.of(Long.toString(id)));
+        vectorStore.delete(List.of("article:" + id + ":0", "discussion:" + id + ":0", "generic:" + id + ":0"));
+    }
+
+    private Long toLong(Object value) {
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        return Long.parseLong(value.toString());
     }
 }

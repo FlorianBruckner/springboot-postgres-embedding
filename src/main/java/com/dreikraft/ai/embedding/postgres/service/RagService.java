@@ -1,6 +1,6 @@
 package com.dreikraft.ai.embedding.postgres.service;
 
-import com.dreikraft.ai.embedding.postgres.model.Document;
+import com.dreikraft.ai.embedding.postgres.model.ArticleDocument;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 
@@ -17,9 +17,9 @@ public class RagService {
     }
 
     public String answer(String question) {
-        List<Document> references = documentService.semanticSearch(question, DocumentService.ARTICLE_FILTER_EXPRESSION);
+        List<ArticleDocument> references = documentService.semanticSearch(question, DocumentService.ARTICLE_FILTER_EXPRESSION);
         StringBuilder context = new StringBuilder();
-        for (Document reference : references) {
+        for (ArticleDocument reference : references) {
             context.append("Title: ").append(reference.title()).append('\n')
                     .append("Content: ").append(reference.content()).append("\n\n");
         }

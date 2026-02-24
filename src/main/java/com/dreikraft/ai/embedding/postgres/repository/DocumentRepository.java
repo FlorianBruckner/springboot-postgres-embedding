@@ -1,6 +1,6 @@
 package com.dreikraft.ai.embedding.postgres.repository;
 
-import com.dreikraft.ai.embedding.postgres.model.Document;
+import com.dreikraft.ai.embedding.postgres.model.ArticleDocument;
 import com.dreikraft.ai.embedding.postgres.model.DocumentCreateRequest;
 import com.dreikraft.ai.embedding.postgres.model.DiscussionDocument;
 
@@ -15,13 +15,13 @@ public interface DocumentRepository {
 
     void updateDiscussionClassification(long id, String sentiment, String responseDepth);
 
-    Optional<Document> findById(long id);
+    Optional<ArticleDocument> findById(long id);
 
-    List<Document> findByIds(List<Long> ids);
+    List<ArticleDocument> findByIds(List<Long> ids);
 
-    List<Document> keywordSearch(String term, int limit);
+    List<ArticleDocument> keywordSearch(String term, int limit);
 
-    List<Document> keywordSearchBySampleType(String term, int limit, String sampleType);
+    List<ArticleDocument> keywordSearchBySampleType(String term, int limit, String sampleType);
 
     List<DiscussionDocument> findDiscussionsByArticleId(long articleDocumentId);
 

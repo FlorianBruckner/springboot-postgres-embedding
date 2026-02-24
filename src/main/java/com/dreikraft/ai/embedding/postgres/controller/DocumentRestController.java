@@ -1,6 +1,6 @@
 package com.dreikraft.ai.embedding.postgres.controller;
 
-import com.dreikraft.ai.embedding.postgres.model.Document;
+import com.dreikraft.ai.embedding.postgres.model.ArticleDocument;
 import com.dreikraft.ai.embedding.postgres.model.DocumentCreateRequest;
 import com.dreikraft.ai.embedding.postgres.model.DocumentUpdateRequest;
 import com.dreikraft.ai.embedding.postgres.service.DocumentService;
@@ -33,17 +33,17 @@ public class DocumentRestController {
     }
 
     @GetMapping("/{id}")
-    public Document byId(@PathVariable long id) {
+    public ArticleDocument byId(@PathVariable long id) {
         return service.findById(id);
     }
 
     @GetMapping("/search")
-    public List<Document> keywordSearch(@RequestParam String query) {
+    public List<ArticleDocument> keywordSearch(@RequestParam String query) {
         return service.keywordSearch(query);
     }
 
     @GetMapping("/semantic-search")
-    public List<Document> semanticSearch(@RequestParam String query,
+    public List<ArticleDocument> semanticSearch(@RequestParam String query,
                                          @RequestParam(required = false) String filterExpression) {
         return service.semanticSearch(query, filterExpression);
     }

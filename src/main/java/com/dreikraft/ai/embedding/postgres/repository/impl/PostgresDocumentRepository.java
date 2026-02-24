@@ -1,14 +1,19 @@
 package com.dreikraft.ai.embedding.postgres.repository.impl;
 
-import com.dreikraft.ai.embedding.postgres.model.Document;
+import com.dreikraft.ai.embedding.postgres.mapper.DocumentEntityMapper;
+import com.dreikraft.ai.embedding.postgres.model.ArticleDocument;
 import com.dreikraft.ai.embedding.postgres.model.DocumentCreateRequest;
 import com.dreikraft.ai.embedding.postgres.model.DiscussionDocument;
+import com.dreikraft.ai.embedding.postgres.persistence.entity.DocumentEntity;
+import com.dreikraft.ai.embedding.postgres.persistence.repository.DocumentJpaRepository;
 import com.dreikraft.ai.embedding.postgres.repository.DocumentRepository;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -18,224 +23,147 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Repository
+@Transactional
 @ConditionalOnProperty(prefix = "app.database", name = "vendor", havingValue = "postgres", matchIfMissing = true)
 public class PostgresDocumentRepository implements DocumentRepository {
     private static final String TYPE_ARTICLE = "article";
     private static final String TYPE_DISCUSSION = "discussion";
-    private static final String TYPE_GENERIC = "generic";
 
-    private final JdbcTemplate jdbcTemplate;
+    private final DocumentJpaRepository jpaRepository;
+    private final DocumentEntityMapper mapper;
 
-    public PostgresDocumentRepository(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public PostgresDocumentRepository(DocumentJpaRepository jpaRepository, DocumentEntityMapper mapper) {
+        this.jpaRepository = jpaRepository;
+        this.mapper = mapper;
     }
 
     @Override
     public long create(DocumentCreateRequest request) {
         Map<String, Object> properties = request.propertiesOrEmpty();
-        String documentType = resolveDocumentType(properties);
-        Long articleDocumentId = toLong(properties.get("relatedArticleDocumentId"));
-        Long parentDocumentId = toLong(properties.get("respondsToDocumentId"));
-        String discussionSection = toStringValue(properties.get("discussionSection"));
 
-        Long id = jdbcTemplate.queryForObject(
-                """
-                        INSERT INTO documents (title, content, document_type, article_document_id, parent_document_id, discussion_section)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                        RETURNING id
-                        """,
-                Long.class,
-                request.title(),
-                request.content(),
-                documentType,
-                articleDocumentId,
-                parentDocumentId,
-                discussionSection
-        );
+        DocumentEntity entity = new DocumentEntity();
+        entity.setTitle(request.title());
+        entity.setContent(request.content());
+        entity.setArticleDocumentId(toLong(properties.get("relatedArticleDocumentId")));
+        entity.setParentDocumentId(toLong(properties.get("respondsToDocumentId")));
+        entity.setDiscussionSection(toStringValue(properties.get("discussionSection")));
 
-        return id;
+        return jpaRepository.save(entity).getId();
     }
 
     @Override
     public void update(long id, String content) {
-        int updated = jdbcTemplate.update(
-                """
-                        UPDATE documents
-                        SET content = ?, updated_at = NOW()
-                        WHERE id = ?
-                        """,
-                content,
-                id
-        );
-        if (updated == 0) {
-            throw new IllegalArgumentException("Document not found: " + id);
-        }
-    }
+        DocumentEntity entity = jpaRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Document not found: " + id));
 
+        entity.setContent(content);
+        entity.setContentHash(hashContent(content));
+        entity.setEmbeddingModel(null);
+        entity.setEmbeddingVersion(null);
+        entity.setEmbeddedAt(null);
+
+        jpaRepository.save(entity);
+    }
 
     @Override
     public void updateDiscussionClassification(long id, String sentiment, String responseDepth) {
-        int updated = jdbcTemplate.update(
-                """
-                        UPDATE documents
-                        SET sentiment = ?, response_depth = ?
-                        WHERE id = ?
-                        """,
-                sentiment,
-                responseDepth,
-                id
-        );
-        if (updated == 0) {
-            throw new IllegalArgumentException("Document not found: " + id);
+        DocumentEntity entity = jpaRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Document not found: " + id));
+
+        entity.setSentiment(sentiment);
+        entity.setResponseDepth(responseDepth);
+        entity.setClassificationStatus("completed");
+        entity.setClassifiedAt(OffsetDateTime.now());
+        if (entity.getClassificationSource() == null || entity.getClassificationSource().isBlank()) {
+            entity.setClassificationSource("llm");
         }
+
+        jpaRepository.save(entity);
     }
 
     @Override
-    public Optional<Document> findById(long id) {
-        return jdbcTemplate.query("SELECT id, title, content, updated_at FROM documents WHERE id = ?", rowMapper(), id)
-                .stream()
-                .findFirst();
+    @Transactional(readOnly = true)
+    public Optional<ArticleDocument> findById(long id) {
+        return jpaRepository.findById(id).map(mapper::toArticleDocument);
     }
 
     @Override
-    public List<Document> findByIds(List<Long> ids) {
+    @Transactional(readOnly = true)
+    public List<ArticleDocument> findByIds(List<Long> ids) {
         if (ids.isEmpty()) {
             return List.of();
         }
-        String placeholders = ids.stream().map(id -> "?").collect(Collectors.joining(","));
-        List<Document> docs = jdbcTemplate.query(
-                "SELECT id, title, content, updated_at FROM documents WHERE id IN (" + placeholders + ")",
-                rowMapper(),
-                ids.toArray()
-        );
-        Map<Long, Document> byId = docs.stream().collect(Collectors.toMap(Document::id, doc -> doc));
-        List<Document> ordered = new ArrayList<>();
+        List<DocumentEntity> entities = jpaRepository.findByIdIn(ids);
+        Map<Long, ArticleDocument> byId = entities.stream()
+                .map(mapper::toArticleDocument)
+                .collect(Collectors.toMap(ArticleDocument::id, a -> a));
+
+        List<ArticleDocument> ordered = new ArrayList<>();
         for (Long id : ids) {
-            Document doc = byId.get(id);
-            if (doc != null) {
-                ordered.add(doc);
+            ArticleDocument article = byId.get(id);
+            if (article != null) {
+                ordered.add(article);
             }
         }
         return ordered;
     }
 
     @Override
-    public List<Document> keywordSearch(String term, int limit) {
-        return jdbcTemplate.query(
-                """
-                        SELECT id, title, content, updated_at
-                        FROM documents
-                        WHERE to_tsvector('english', title || ' ' || content) @@ plainto_tsquery('english', ?)
-                        ORDER BY updated_at DESC
-                        LIMIT ?
-                        """,
-                rowMapper(), term, limit
-        );
+    @Transactional(readOnly = true)
+    public List<ArticleDocument> keywordSearch(String term, int limit) {
+        return jpaRepository.keywordSearch(term, limit).stream()
+                .map(mapper::toArticleDocument)
+                .toList();
     }
 
     @Override
-    public List<Document> keywordSearchBySampleType(String term, int limit, String sampleType) {
-        return jdbcTemplate.query(
-                """
-                        SELECT id, title, content, updated_at
-                        FROM documents
-                        WHERE document_type = ?
-                          AND to_tsvector('english', title || ' ' || content) @@ plainto_tsquery('english', ?)
-                        ORDER BY updated_at DESC
-                        LIMIT ?
-                        """,
-                rowMapper(), sampleType, term, limit
-        );
+    @Transactional(readOnly = true)
+    public List<ArticleDocument> keywordSearchBySampleType(String term, int limit, String sampleType) {
+        List<DocumentEntity> entities = TYPE_DISCUSSION.equals(sampleType)
+                ? jpaRepository.keywordSearchDiscussions(term, limit)
+                : jpaRepository.keywordSearchArticles(term, limit);
+        return entities.stream().map(mapper::toArticleDocument).toList();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<DiscussionDocument> findDiscussionsByArticleId(long articleDocumentId) {
-        return jdbcTemplate.query(
-                """
-                        SELECT id,
-                               title,
-                               content,
-                               updated_at,
-                               parent_document_id,
-                               discussion_section,
-                               sentiment,
-                               response_depth
-                        FROM documents
-                        WHERE document_type = 'discussion'
-                          AND article_document_id = ?
-                        ORDER BY id
-                        """,
-                (rs, rowNum) -> new DiscussionDocument(
-                        rs.getLong("id"),
-                        rs.getString("title"),
-                        rs.getString("content"),
-                        rs.getObject("updated_at", OffsetDateTime.class),
-                        rs.getObject("parent_document_id", Long.class),
-                        rs.getString("discussion_section"),
-                        rs.getString("sentiment"),
-                        rs.getString("response_depth")
-                ),
-                articleDocumentId
-        );
-    }
-
-    @Override
-    public Map<String, Object> findVectorMetadataById(long id) {
-        return jdbcTemplate.query(
-                        """
-                                SELECT document_type, article_document_id, parent_document_id, discussion_section
-                                FROM documents
-                                WHERE id = ?
-                                """,
-                        (rs, rowNum) -> {
-                            Map<String, Object> metadata = new LinkedHashMap<>();
-                            metadata.put("sampleType", rs.getString("document_type"));
-
-                            Long articleId = rs.getObject("article_document_id", Long.class);
-                            if (articleId != null) {
-                                metadata.put("relatedArticleDocumentId", articleId);
-                            }
-
-                            Long parentId = rs.getObject("parent_document_id", Long.class);
-                            if (parentId != null) {
-                                metadata.put("respondsToDocumentId", parentId);
-                            }
-
-                            String section = rs.getString("discussion_section");
-                            if (section != null && !section.isBlank()) {
-                                metadata.put("discussionSection", section);
-                            }
-
-                            return metadata;
-                        },
-                        id
-                )
+        return jpaRepository.findByArticleDocumentIdOrderByIdAsc(articleDocumentId)
                 .stream()
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Document not found: " + id));
+                .map(mapper::toDiscussionDocument)
+                .toList();
     }
 
     @Override
-    public long count() {
-        return jdbcTemplate.queryForObject("SELECT COUNT(*) FROM documents", Long.class);
-    }
+    @Transactional(readOnly = true)
+    public Map<String, Object> findVectorMetadataById(long id) {
+        DocumentEntity entity = jpaRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Document not found: " + id));
 
-    private RowMapper<Document> rowMapper() {
-        return (rs, rowNum) -> new Document(
-                rs.getLong("id"),
-                rs.getString("title"),
-                rs.getString("content"),
-                rs.getObject("updated_at", OffsetDateTime.class)
-        );
-    }
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("sampleType", entity.getArticleDocumentId() == null ? TYPE_ARTICLE : TYPE_DISCUSSION);
 
-    private String resolveDocumentType(Map<String, Object> properties) {
-        String typeFromProperties = toStringValue(properties.get("sampleType"));
-        if (TYPE_ARTICLE.equals(typeFromProperties) || TYPE_DISCUSSION.equals(typeFromProperties) || TYPE_GENERIC.equals(typeFromProperties)) {
-            return typeFromProperties;
+        if (entity.getArticleDocumentId() != null) {
+            metadata.put("relatedArticleDocumentId", entity.getArticleDocumentId());
         }
-        return properties.containsKey("relatedArticleDocumentId") ? TYPE_DISCUSSION : TYPE_GENERIC;
+
+        if (entity.getParentDocumentId() != null) {
+            metadata.put("respondsToDocumentId", entity.getParentDocumentId());
+        }
+
+        if (entity.getDiscussionSection() != null && !entity.getDiscussionSection().isBlank()) {
+            metadata.put("discussionSection", entity.getDiscussionSection());
+        }
+
+        return metadata;
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long count() {
+        return jpaRepository.count();
+    }
+
 
     private Long toLong(Object value) {
         if (value == null) {
@@ -249,5 +177,19 @@ public class PostgresDocumentRepository implements DocumentRepository {
 
     private String toStringValue(Object value) {
         return value == null ? null : value.toString();
+    }
+
+    private String hashContent(String content) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(content.getBytes(StandardCharsets.UTF_8));
+            StringBuilder builder = new StringBuilder();
+            for (byte b : hash) {
+                builder.append(String.format("%02x", b));
+            }
+            return builder.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 algorithm is not available", e);
+        }
     }
 }

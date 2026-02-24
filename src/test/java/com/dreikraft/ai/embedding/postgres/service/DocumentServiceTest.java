@@ -1,6 +1,6 @@
 package com.dreikraft.ai.embedding.postgres.service;
 
-import com.dreikraft.ai.embedding.postgres.model.Document;
+import com.dreikraft.ai.embedding.postgres.model.ArticleDocument;
 import com.dreikraft.ai.embedding.postgres.model.DocumentCreateRequest;
 import com.dreikraft.ai.embedding.postgres.model.DiscussionDocument;
 import com.dreikraft.ai.embedding.postgres.model.ThreadedDiscussionItem;
@@ -65,7 +65,7 @@ class DocumentServiceTest {
 
         when(repository.create(request)).thenReturn(11L);
         when(repository.findDiscussionsByArticleId(1L)).thenReturn(List.of(root, reply));
-        when(repository.findById(1L)).thenReturn(Optional.of(new Document(1L, "Article", "Article content", now)));
+        when(repository.findById(1L)).thenReturn(Optional.of(new ArticleDocument(1L, "Article", "Article content", now)));
         when(classificationService.classify(new DiscussionClassificationService.DiscussionClassificationInput(
                 "Article",
                 "Article content",
@@ -120,10 +120,10 @@ class DocumentServiceTest {
         when(vectorStoreService.searchIds("java streams basics", 20, DocumentService.ARTICLE_FILTER_EXPRESSION))
                 .thenReturn(List.of(2L));
         when(repository.findByIds(List.of(2L))).thenReturn(List.of(
-                new Document(2L, "Streams", "...", OffsetDateTime.now())
+                new ArticleDocument(2L, "Streams", "...", OffsetDateTime.now())
         ));
 
-        List<Document> results = service.semanticSearch("how streams work");
+        List<ArticleDocument> results = service.semanticSearch("how streams work");
 
         assertEquals(1, results.size());
         verify(vectorStoreService).searchIds("java streams basics", 20, DocumentService.ARTICLE_FILTER_EXPRESSION);
