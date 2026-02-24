@@ -6,8 +6,7 @@ import java.time.OffsetDateTime;
 
 @Entity
 @Table(name = "documents")
-public class DocumentEntity {
-
+public class DiscussionEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -18,7 +17,6 @@ public class DocumentEntity {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
-
     @Column(name = "article_document_id")
     private Long articleDocumentId;
 
@@ -28,32 +26,11 @@ public class DocumentEntity {
     @Column(name = "discussion_section", length = 255)
     private String discussionSection;
 
-    @Column(name = "updated_at", nullable = false)
-    private OffsetDateTime updatedAt;
-
     @Column(name = "sentiment", length = 32)
     private String sentiment;
 
     @Column(name = "response_depth", length = 32)
     private String responseDepth;
-
-    @Column(name = "content_hash")
-    private String contentHash;
-
-    @Column(name = "embedding_model", length = 128)
-    private String embeddingModel;
-
-    @Column(name = "embedding_version", length = 64)
-    private String embeddingVersion;
-
-    @Column(name = "embedded_at")
-    private OffsetDateTime embeddedAt;
-
-    @Column(name = "classification_model", length = 128)
-    private String classificationModel;
-
-    @Column(name = "classification_prompt_version", length = 64)
-    private String classificationPromptVersion;
 
     @Column(name = "classified_at")
     private OffsetDateTime classifiedAt;
@@ -66,6 +43,9 @@ public class DocumentEntity {
 
     @Column(name = "classification_source", length = 64)
     private String classificationSource;
+
+    @Column(name = "updated_at", nullable = false)
+    private OffsetDateTime updatedAt;
 
     @PrePersist
     void onCreate() {
@@ -91,24 +71,10 @@ public class DocumentEntity {
     public void setParentDocumentId(Long parentDocumentId) { this.parentDocumentId = parentDocumentId; }
     public String getDiscussionSection() { return discussionSection; }
     public void setDiscussionSection(String discussionSection) { this.discussionSection = discussionSection; }
-    public OffsetDateTime getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(OffsetDateTime updatedAt) { this.updatedAt = updatedAt; }
     public String getSentiment() { return sentiment; }
     public void setSentiment(String sentiment) { this.sentiment = sentiment; }
     public String getResponseDepth() { return responseDepth; }
     public void setResponseDepth(String responseDepth) { this.responseDepth = responseDepth; }
-    public String getContentHash() { return contentHash; }
-    public void setContentHash(String contentHash) { this.contentHash = contentHash; }
-    public String getEmbeddingModel() { return embeddingModel; }
-    public void setEmbeddingModel(String embeddingModel) { this.embeddingModel = embeddingModel; }
-    public String getEmbeddingVersion() { return embeddingVersion; }
-    public void setEmbeddingVersion(String embeddingVersion) { this.embeddingVersion = embeddingVersion; }
-    public OffsetDateTime getEmbeddedAt() { return embeddedAt; }
-    public void setEmbeddedAt(OffsetDateTime embeddedAt) { this.embeddedAt = embeddedAt; }
-    public String getClassificationModel() { return classificationModel; }
-    public void setClassificationModel(String classificationModel) { this.classificationModel = classificationModel; }
-    public String getClassificationPromptVersion() { return classificationPromptVersion; }
-    public void setClassificationPromptVersion(String classificationPromptVersion) { this.classificationPromptVersion = classificationPromptVersion; }
     public OffsetDateTime getClassifiedAt() { return classifiedAt; }
     public void setClassifiedAt(OffsetDateTime classifiedAt) { this.classifiedAt = classifiedAt; }
     public String getClassificationStatus() { return classificationStatus; }
@@ -117,4 +83,6 @@ public class DocumentEntity {
     public void setSentimentConfidence(Double sentimentConfidence) { this.sentimentConfidence = sentimentConfidence; }
     public String getClassificationSource() { return classificationSource; }
     public void setClassificationSource(String classificationSource) { this.classificationSource = classificationSource; }
+    public OffsetDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(OffsetDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

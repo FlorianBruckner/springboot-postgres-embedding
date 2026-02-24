@@ -8,14 +8,12 @@ public record ArticleDocument(
         String content,
         OffsetDateTime updatedAt,
         String contentHash,
-        String embeddingModel,
-        String embeddingVersion,
         OffsetDateTime embeddedAt
 ) {
     public ArticleDocument(Long id,
                            String title,
                            String content,
                            OffsetDateTime updatedAt) {
-        this(id, title, content, updatedAt, null, null, null, null);
+        this(id, title, content, updatedAt, null, null);
     }
 }

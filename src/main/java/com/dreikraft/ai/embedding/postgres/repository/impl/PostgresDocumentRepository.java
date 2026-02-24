@@ -1,11 +1,14 @@
 package com.dreikraft.ai.embedding.postgres.repository.impl;
 
-import com.dreikraft.ai.embedding.postgres.mapper.DocumentEntityMapper;
+import com.dreikraft.ai.embedding.postgres.mapper.ArticleEntityMapper;
+import com.dreikraft.ai.embedding.postgres.mapper.DiscussionEntityMapper;
 import com.dreikraft.ai.embedding.postgres.model.ArticleDocument;
 import com.dreikraft.ai.embedding.postgres.model.DocumentCreateRequest;
 import com.dreikraft.ai.embedding.postgres.model.DiscussionDocument;
-import com.dreikraft.ai.embedding.postgres.persistence.entity.DocumentEntity;
-import com.dreikraft.ai.embedding.postgres.persistence.repository.DocumentJpaRepository;
+import com.dreikraft.ai.embedding.postgres.persistence.entity.ArticleEntity;
+import com.dreikraft.ai.embedding.postgres.persistence.entity.DiscussionEntity;
+import com.dreikraft.ai.embedding.postgres.persistence.repository.ArticleJpaRepository;
+import com.dreikraft.ai.embedding.postgres.persistence.repository.DiscussionJpaRepository;
 import com.dreikraft.ai.embedding.postgres.repository.DocumentRepository;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
@@ -29,45 +32,62 @@ public class PostgresDocumentRepository implements DocumentRepository {
     private static final String TYPE_ARTICLE = "article";
     private static final String TYPE_DISCUSSION = "discussion";
 
-    private final DocumentJpaRepository jpaRepository;
-    private final DocumentEntityMapper mapper;
+    private final ArticleJpaRepository articleRepository;
+    private final DiscussionJpaRepository discussionRepository;
+    private final ArticleEntityMapper articleMapper;
+    private final DiscussionEntityMapper discussionMapper;
 
-    public PostgresDocumentRepository(DocumentJpaRepository jpaRepository, DocumentEntityMapper mapper) {
-        this.jpaRepository = jpaRepository;
-        this.mapper = mapper;
+    public PostgresDocumentRepository(ArticleJpaRepository articleRepository,
+                                      DiscussionJpaRepository discussionRepository,
+                                      ArticleEntityMapper articleMapper,
+                                      DiscussionEntityMapper discussionMapper) {
+        this.articleRepository = articleRepository;
+        this.discussionRepository = discussionRepository;
+        this.articleMapper = articleMapper;
+        this.discussionMapper = discussionMapper;
     }
 
     @Override
     public long create(DocumentCreateRequest request) {
         Map<String, Object> properties = request.propertiesOrEmpty();
+        Long relatedArticleId = toLong(properties.get("relatedArticleDocumentId"));
+        if (relatedArticleId == null) {
+            ArticleEntity entity = new ArticleEntity();
+            entity.setTitle(request.title());
+            entity.setContent(request.content());
+            return articleRepository.save(entity).getId();
+        }
 
-        DocumentEntity entity = new DocumentEntity();
+        DiscussionEntity entity = new DiscussionEntity();
         entity.setTitle(request.title());
         entity.setContent(request.content());
-        entity.setArticleDocumentId(toLong(properties.get("relatedArticleDocumentId")));
+        entity.setArticleDocumentId(relatedArticleId);
         entity.setParentDocumentId(toLong(properties.get("respondsToDocumentId")));
         entity.setDiscussionSection(toStringValue(properties.get("discussionSection")));
-
-        return jpaRepository.save(entity).getId();
+        return discussionRepository.save(entity).getId();
     }
 
     @Override
     public void update(long id, String content) {
-        DocumentEntity entity = jpaRepository.findById(id)
+        Optional<ArticleEntity> article = articleRepository.findById(id);
+        if (article.isPresent()) {
+            ArticleEntity entity = article.get();
+            entity.setContent(content);
+            entity.setContentHash(hashContent(content));
+            entity.setEmbeddedAt(null);
+            articleRepository.save(entity);
+            return;
+        }
+
+        DiscussionEntity discussion = discussionRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Document not found: " + id));
-
-        entity.setContent(content);
-        entity.setContentHash(hashContent(content));
-        entity.setEmbeddingModel(null);
-        entity.setEmbeddingVersion(null);
-        entity.setEmbeddedAt(null);
-
-        jpaRepository.save(entity);
+        discussion.setContent(content);
+        discussionRepository.save(discussion);
     }
 
     @Override
     public void updateDiscussionClassification(long id, String sentiment, String responseDepth) {
-        DocumentEntity entity = jpaRepository.findById(id)
+        DiscussionEntity entity = discussionRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Document not found: " + id));
 
         entity.setSentiment(sentiment);
@@ -78,13 +98,13 @@ public class PostgresDocumentRepository implements DocumentRepository {
             entity.setClassificationSource("llm");
         }
 
-        jpaRepository.save(entity);
+        discussionRepository.save(entity);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Optional<ArticleDocument> findById(long id) {
-        return jpaRepository.findById(id).map(mapper::toArticleDocument);
+        return articleRepository.findById(id).map(articleMapper::toArticleDocument);
     }
 
     @Override
@@ -93,9 +113,9 @@ public class PostgresDocumentRepository implements DocumentRepository {
         if (ids.isEmpty()) {
             return List.of();
         }
-        List<DocumentEntity> entities = jpaRepository.findByIdIn(ids);
+        List<ArticleEntity> entities = articleRepository.findArticlesByIdIn(ids);
         Map<Long, ArticleDocument> byId = entities.stream()
-                .map(mapper::toArticleDocument)
+                .map(articleMapper::toArticleDocument)
                 .collect(Collectors.toMap(ArticleDocument::id, a -> a));
 
         List<ArticleDocument> ordered = new ArrayList<>();
@@ -111,59 +131,60 @@ public class PostgresDocumentRepository implements DocumentRepository {
     @Override
     @Transactional(readOnly = true)
     public List<ArticleDocument> keywordSearch(String term, int limit) {
-        return jpaRepository.keywordSearch(term, limit).stream()
-                .map(mapper::toArticleDocument)
+        return articleRepository.keywordSearchArticles(term, limit).stream()
+                .map(articleMapper::toArticleDocument)
                 .toList();
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<ArticleDocument> keywordSearchBySampleType(String term, int limit, String sampleType) {
-        List<DocumentEntity> entities = TYPE_DISCUSSION.equals(sampleType)
-                ? jpaRepository.keywordSearchDiscussions(term, limit)
-                : jpaRepository.keywordSearchArticles(term, limit);
-        return entities.stream().map(mapper::toArticleDocument).toList();
+        if (TYPE_DISCUSSION.equals(sampleType)) {
+            return List.of();
+        }
+        return articleRepository.keywordSearchArticles(term, limit).stream()
+                .map(articleMapper::toArticleDocument)
+                .toList();
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<DiscussionDocument> findDiscussionsByArticleId(long articleDocumentId) {
-        return jpaRepository.findByArticleDocumentIdOrderByIdAsc(articleDocumentId)
+        return discussionRepository.findByArticleDocumentIdOrderByIdAsc(articleDocumentId)
                 .stream()
-                .map(mapper::toDiscussionDocument)
+                .map(discussionMapper::toDiscussionDocument)
                 .toList();
     }
 
     @Override
     @Transactional(readOnly = true)
     public Map<String, Object> findVectorMetadataById(long id) {
-        DocumentEntity entity = jpaRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Document not found: " + id));
-
-        Map<String, Object> metadata = new LinkedHashMap<>();
-        metadata.put("sampleType", entity.getArticleDocumentId() == null ? TYPE_ARTICLE : TYPE_DISCUSSION);
-
-        if (entity.getArticleDocumentId() != null) {
-            metadata.put("relatedArticleDocumentId", entity.getArticleDocumentId());
+        Optional<DiscussionEntity> discussionOpt = discussionRepository.findById(id);
+        if (discussionOpt.isPresent()) {
+            DiscussionEntity discussion = discussionOpt.get();
+            Map<String, Object> metadata = new LinkedHashMap<>();
+            metadata.put("sampleType", TYPE_DISCUSSION);
+            metadata.put("relatedArticleDocumentId", discussion.getArticleDocumentId());
+            if (discussion.getParentDocumentId() != null) {
+                metadata.put("respondsToDocumentId", discussion.getParentDocumentId());
+            }
+            if (discussion.getDiscussionSection() != null && !discussion.getDiscussionSection().isBlank()) {
+                metadata.put("discussionSection", discussion.getDiscussionSection());
+            }
+            return metadata;
         }
 
-        if (entity.getParentDocumentId() != null) {
-            metadata.put("respondsToDocumentId", entity.getParentDocumentId());
+        if (articleRepository.countArticleById(id) > 0) {
+            return Map.of("sampleType", TYPE_ARTICLE);
         }
-
-        if (entity.getDiscussionSection() != null && !entity.getDiscussionSection().isBlank()) {
-            metadata.put("discussionSection", entity.getDiscussionSection());
-        }
-
-        return metadata;
+        throw new IllegalArgumentException("Document not found: " + id);
     }
 
     @Override
     @Transactional(readOnly = true)
     public long count() {
-        return jpaRepository.count();
+        return articleRepository.countArticles() + discussionRepository.count();
     }
-
 
     private Long toLong(Object value) {
         if (value == null) {
