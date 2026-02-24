@@ -32,9 +32,10 @@ public interface DiscussionJpaRepository extends JpaRepository<DiscussionEntity,
             SELECT *
             FROM documents
             WHERE article_document_id = :articleDocumentId
+              AND parent_document_id IS NULL
             ORDER BY id
             """, nativeQuery = true)
-    List<DiscussionEntity> findByArticleDocumentIdOrderByIdAsc(@Param("articleDocumentId") Long articleDocumentId);
+    List<DiscussionEntity> findRootDiscussionsByArticleDocumentIdOrderByIdAsc(@Param("articleDocumentId") Long articleDocumentId);
 
     @Query(value = """
             SELECT COUNT(*)

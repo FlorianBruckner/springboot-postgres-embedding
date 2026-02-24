@@ -61,14 +61,15 @@ public class PostgresDocumentRepository implements DocumentRepository {
         DiscussionEntity entity = new DiscussionEntity();
         entity.setTitle(request.title());
         entity.setContent(request.content());
-        ArticleEntity article = articleRepository.findArticleById(relatedArticleId)
-                .orElseThrow(() -> new IllegalArgumentException("Article not found: " + relatedArticleId));
-        entity.setArticle(article);
         Long parentId = toLong(properties.get("respondsToDocumentId"));
         if (parentId != null) {
             DiscussionEntity parentDiscussion = discussionRepository.findDiscussionById(parentId)
                     .orElseThrow(() -> new IllegalArgumentException("Discussion not found: " + parentId));
             entity.setParentDiscussion(parentDiscussion);
+        } else {
+            ArticleEntity article = articleRepository.findArticleById(relatedArticleId)
+                    .orElseThrow(() -> new IllegalArgumentException("Article not found: " + relatedArticleId));
+            entity.setArticle(article);
         }
         entity.setDiscussionSection(toStringValue(properties.get("discussionSection")));
         return discussionRepository.save(entity).getId();
@@ -157,10 +158,12 @@ public class PostgresDocumentRepository implements DocumentRepository {
     @Override
     @Transactional(readOnly = true)
     public List<DiscussionDocument> findDiscussionsByArticleId(long articleDocumentId) {
-        return discussionRepository.findByArticleDocumentIdOrderByIdAsc(articleDocumentId)
-                .stream()
-                .map(discussionMapper::toDiscussionDocument)
-                .toList();
+        List<DiscussionEntity> roots = discussionRepository.findRootDiscussionsByArticleDocumentIdOrderByIdAsc(articleDocumentId);
+        List<DiscussionDocument> flattened = new ArrayList<>();
+        for (DiscussionEntity root : roots) {
+            appendDiscussion(flattened, root);
+        }
+        return flattened;
     }
 
     @Override
@@ -171,7 +174,10 @@ public class PostgresDocumentRepository implements DocumentRepository {
             DiscussionEntity discussion = discussionOpt.get();
             Map<String, Object> metadata = new LinkedHashMap<>();
             metadata.put("sampleType", TYPE_DISCUSSION);
-            metadata.put("relatedArticleDocumentId", discussion.getArticle().getId());
+            Long relatedArticleId = resolveArticleId(discussion);
+            if (relatedArticleId != null) {
+                metadata.put("relatedArticleDocumentId", relatedArticleId);
+            }
             if (discussion.getParentDiscussion() != null) {
                 metadata.put("respondsToDocumentId", discussion.getParentDiscussion().getId());
             }
@@ -191,6 +197,28 @@ public class PostgresDocumentRepository implements DocumentRepository {
     @Transactional(readOnly = true)
     public long count() {
         return articleRepository.countArticles() + discussionRepository.countDiscussions();
+    }
+
+
+    private void appendDiscussion(List<DiscussionDocument> target, DiscussionEntity entity) {
+        target.add(discussionMapper.toDiscussionDocument(entity));
+        for (DiscussionEntity response : entity.getResponses()) {
+            appendDiscussion(target, response);
+        }
+    }
+
+    private Long resolveArticleId(DiscussionEntity discussion) {
+        if (discussion.getArticle() != null) {
+            return discussion.getArticle().getId();
+        }
+        DiscussionEntity parent = discussion.getParentDiscussion();
+        while (parent != null) {
+            if (parent.getArticle() != null) {
+                return parent.getArticle().getId();
+            }
+            parent = parent.getParentDiscussion();
+        }
+        return null;
     }
 
     private Long toLong(Object value) {

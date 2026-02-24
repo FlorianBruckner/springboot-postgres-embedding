@@ -3,6 +3,8 @@ package com.dreikraft.ai.embedding.postgres.persistence.entity;
 import jakarta.persistence.*;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "documents")
@@ -17,13 +19,17 @@ public class DiscussionEntity {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "article_document_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "article_document_id")
     private ArticleEntity article;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_document_id")
     private DiscussionEntity parentDiscussion;
+
+    @OneToMany(mappedBy = "parentDiscussion", fetch = FetchType.LAZY)
+    @OrderBy("id ASC")
+    private List<DiscussionEntity> responses = new ArrayList<>();
 
     @Column(name = "discussion_section", length = 255)
     private String discussionSection;
@@ -79,6 +85,8 @@ public class DiscussionEntity {
     public void setArticle(ArticleEntity article) { this.article = article; }
     public DiscussionEntity getParentDiscussion() { return parentDiscussion; }
     public void setParentDiscussion(DiscussionEntity parentDiscussion) { this.parentDiscussion = parentDiscussion; }
+    public List<DiscussionEntity> getResponses() { return responses; }
+    public void setResponses(List<DiscussionEntity> responses) { this.responses = responses; }
     public String getDiscussionSection() { return discussionSection; }
     public void setDiscussionSection(String discussionSection) { this.discussionSection = discussionSection; }
     public String getSentiment() { return sentiment; }
