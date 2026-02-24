@@ -6,8 +6,17 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface ArticleJpaRepository extends JpaRepository<ArticleEntity, Long> {
+
+    @Query(value = """
+            SELECT *
+            FROM documents
+            WHERE article_document_id IS NULL
+              AND id = :id
+            """, nativeQuery = true)
+    Optional<ArticleEntity> findArticleById(@Param("id") Long id);
 
     @Query(value = """
             SELECT *

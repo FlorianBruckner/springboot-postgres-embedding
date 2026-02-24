@@ -17,11 +17,13 @@ public class DiscussionEntity {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
-    @Column(name = "article_document_id")
-    private Long articleDocumentId;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "article_document_id", nullable = false)
+    private ArticleEntity article;
 
-    @Column(name = "parent_document_id")
-    private Long parentDocumentId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_document_id")
+    private DiscussionEntity parentDiscussion;
 
     @Column(name = "discussion_section", length = 255)
     private String discussionSection;
@@ -59,16 +61,24 @@ public class DiscussionEntity {
         updatedAt = OffsetDateTime.now();
     }
 
+    public Long getArticleDocumentId() {
+        return article == null ? null : article.getId();
+    }
+
+    public Long getParentDocumentId() {
+        return parentDiscussion == null ? null : parentDiscussion.getId();
+    }
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }
-    public Long getArticleDocumentId() { return articleDocumentId; }
-    public void setArticleDocumentId(Long articleDocumentId) { this.articleDocumentId = articleDocumentId; }
-    public Long getParentDocumentId() { return parentDocumentId; }
-    public void setParentDocumentId(Long parentDocumentId) { this.parentDocumentId = parentDocumentId; }
+    public ArticleEntity getArticle() { return article; }
+    public void setArticle(ArticleEntity article) { this.article = article; }
+    public DiscussionEntity getParentDiscussion() { return parentDiscussion; }
+    public void setParentDiscussion(DiscussionEntity parentDiscussion) { this.parentDiscussion = parentDiscussion; }
     public String getDiscussionSection() { return discussionSection; }
     public void setDiscussionSection(String discussionSection) { this.discussionSection = discussionSection; }
     public String getSentiment() { return sentiment; }

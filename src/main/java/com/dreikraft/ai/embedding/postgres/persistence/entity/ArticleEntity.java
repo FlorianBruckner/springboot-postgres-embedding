@@ -3,6 +3,8 @@ package com.dreikraft.ai.embedding.postgres.persistence.entity;
 import jakarta.persistence.*;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "documents")
@@ -25,6 +27,9 @@ public class ArticleEntity {
 
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
+
+    @OneToMany(mappedBy = "article", fetch = FetchType.LAZY)
+    private List<DiscussionEntity> discussions = new ArrayList<>();
 
     @PrePersist
     void onCreate() {
@@ -50,4 +55,6 @@ public class ArticleEntity {
     public void setEmbeddedAt(OffsetDateTime embeddedAt) { this.embeddedAt = embeddedAt; }
     public OffsetDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(OffsetDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public List<DiscussionEntity> getDiscussions() { return discussions; }
+    public void setDiscussions(List<DiscussionEntity> discussions) { this.discussions = discussions; }
 }

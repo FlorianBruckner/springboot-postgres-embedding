@@ -6,8 +6,17 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface DiscussionJpaRepository extends JpaRepository<DiscussionEntity, Long> {
+
+    @Query(value = """
+            SELECT *
+            FROM documents
+            WHERE article_document_id IS NOT NULL
+              AND id = :id
+            """, nativeQuery = true)
+    Optional<DiscussionEntity> findDiscussionById(@Param("id") Long id);
 
     @Query(value = """
             SELECT *
@@ -19,5 +28,19 @@ public interface DiscussionJpaRepository extends JpaRepository<DiscussionEntity,
             """, nativeQuery = true)
     List<DiscussionEntity> keywordSearchDiscussions(@Param("term") String term, @Param("limit") int limit);
 
-    List<DiscussionEntity> findByArticleDocumentIdOrderByIdAsc(Long articleDocumentId);
+    @Query(value = """
+            SELECT *
+            FROM documents
+            WHERE article_document_id = :articleDocumentId
+            ORDER BY id
+            """, nativeQuery = true)
+    List<DiscussionEntity> findByArticleDocumentIdOrderByIdAsc(@Param("articleDocumentId") Long articleDocumentId);
+
+    @Query(value = """
+            SELECT COUNT(*)
+            FROM documents
+            WHERE article_document_id IS NOT NULL
+            """, nativeQuery = true)
+    long countDiscussions();
 }
+
