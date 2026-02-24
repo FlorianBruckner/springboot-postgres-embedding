@@ -12,8 +12,6 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration/${app.database.vendor}
-  autoconfigure:
-    exclude: org.springframework.ai.vectorstore.mariadb.autoconfigure.MariaDbStoreAutoConfiguration
   ai:
     openai:
       base-url: http://localhost:1234

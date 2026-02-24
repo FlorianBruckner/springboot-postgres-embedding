@@ -1,6 +1,5 @@
 package com.dreikraft.ai.embedding.postgres;
 
-import com.dreikraft.ai.embedding.postgres.AbstractOllamaTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -52,7 +51,6 @@ class PostgresDocumentIntegrationTest extends AbstractOllamaTest {
         registry.add("spring.ai.openai.base-url", () -> ollama.getEndpoint() /*"http://" + ollama.getHost() + ":" + ollama.getMappedPort(8080)*/);
         registry.add("spring.ai.openai.embedding.options.model", () -> "all-minilm");
         registry.add("spring.ai.openai.api-key", () -> "test-key");
-        registry.add("spring.autoconfigure.exclude", () -> "org.springframework.ai.vectorstore.mariadb.autoconfigure.MariaDbStoreAutoConfiguration");
 
         registry.add("spring.ai.vectorstore.pgvector.enabled", () -> "true");
         registry.add("spring.ai.vectorstore.pgvector.initialize-schema", () -> "true");
