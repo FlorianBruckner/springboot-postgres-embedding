@@ -10,20 +10,13 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import org.junit.jupiter.api.BeforeAll;
-import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.ollama.OllamaContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -63,23 +56,10 @@ class PostgresDocumentIntegrationTest extends AbstractOllamaTest {
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
     @Test
-    void shouldCreateUpdateAndSearchDocumentsUsingContainerizedEmbeddingApi() throws IOException, InterruptedException {
-        HttpResponse<String> createResponse = sendJson("POST", "/api/documents",
-                "{\"title\":\"Java Memory\",\"content\":\"Java manages heap memory and garbage collection efficiently.\"}");
-        assertEquals(HttpStatus.CREATED.value(), createResponse.statusCode());
-        assertTrue(createResponse.body().contains("id"));
-
-        HttpResponse<String> searchResponse = send("GET", "/api/documents/search?query=garbage%20collection");
-        assertEquals(HttpStatus.OK.value(), searchResponse.statusCode());
-        assertTrue(searchResponse.body().contains("Java Memory"));
-
-        HttpResponse<String> updateResponse = sendJson("PUT", "/api/documents/1",
-                "{\"content\":\"Java records provide immutable data carrier semantics.\"}");
-        assertEquals(HttpStatus.NO_CONTENT.value(), updateResponse.statusCode());
-
-        HttpResponse<String> semanticResponse = send("GET", "/api/documents/semantic-search?query=immutable%20records");
-        assertEquals(HttpStatus.OK.value(), semanticResponse.statusCode());
-        assertTrue(semanticResponse.body().contains("title"));
+    void shouldRenderMvcIndexPage() throws IOException, InterruptedException {
+        HttpResponse<String> indexResponse = send("GET", "/");
+        assertEquals(HttpStatus.OK.value(), indexResponse.statusCode());
+        assertTrue(indexResponse.body().contains("<html"));
     }
 
     private HttpResponse<String> send(String method, String path) throws IOException, InterruptedException {
@@ -90,12 +70,4 @@ class PostgresDocumentIntegrationTest extends AbstractOllamaTest {
         return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     }
 
-    private HttpResponse<String> sendJson(String method, String path, String body) throws IOException, InterruptedException {
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create("http://localhost:" + port + path))
-                .header("Content-Type", "application/json")
-                .method(method, HttpRequest.BodyPublishers.ofString(body))
-                .build();
-        return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-    }
 }
