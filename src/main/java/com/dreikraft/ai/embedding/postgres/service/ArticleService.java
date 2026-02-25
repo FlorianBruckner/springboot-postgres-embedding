@@ -23,19 +23,19 @@ public class ArticleService {
     private final ArticleJpaRepository articleRepository;
     private final ArticleEntityMapper articleMapper;
     private final SemanticSummaryService semanticSummaryService;
-    private final EmbeddingTransformationService embeddingTransformationService;
     private final DocumentVectorStoreService vectorStoreService;
+    private final DocumentIndexingJobService documentIndexingJobService;
 
     public ArticleService(ArticleJpaRepository articleRepository,
                           ArticleEntityMapper articleMapper,
                           SemanticSummaryService semanticSummaryService,
-                          EmbeddingTransformationService embeddingTransformationService,
-                          DocumentVectorStoreService vectorStoreService) {
+                          DocumentVectorStoreService vectorStoreService,
+                          DocumentIndexingJobService documentIndexingJobService) {
         this.articleRepository = articleRepository;
         this.articleMapper = articleMapper;
         this.semanticSummaryService = semanticSummaryService;
-        this.embeddingTransformationService = embeddingTransformationService;
         this.vectorStoreService = vectorStoreService;
+        this.documentIndexingJobService = documentIndexingJobService;
     }
 
     public long create(ArticleCreateRequest request) {
@@ -43,10 +43,7 @@ public class ArticleService {
         entity.setTitle(request.title());
         entity.setContent(request.content());
         ArticleEntity saved = articleRepository.save(entity);
-
-        List<EmbeddingTransformationService.EmbeddingVariant> variants = embeddingTransformationService
-                .transformForArticle(request.title(), semanticSummaryService.summarizeDocumentForEmbedding(request.title(), request.content()));
-        vectorStoreService.upsertVariants(saved.getId(), "article", request.title(), variants, Map.of("sampleType", "article"));
+        documentIndexingJobService.enqueue(DocumentIndexingJobService.JOB_TYPE_UPSERT_VECTOR, "article", saved.getId());
         return saved.getId();
     }
 
@@ -57,10 +54,7 @@ public class ArticleService {
         entity.setContentHash(hashContent(content));
         entity.setEmbeddedAt(null);
         articleRepository.save(entity);
-
-        List<EmbeddingTransformationService.EmbeddingVariant> variants = embeddingTransformationService
-                .transformForArticle(entity.getTitle(), semanticSummaryService.summarizeDocumentForEmbedding(entity.getTitle(), content));
-        vectorStoreService.upsertVariants(id, "article", entity.getTitle(), variants, Map.of("sampleType", "article"));
+        documentIndexingJobService.enqueue(DocumentIndexingJobService.JOB_TYPE_UPSERT_VECTOR, "article", id);
     }
 
     @Transactional(readOnly = true)

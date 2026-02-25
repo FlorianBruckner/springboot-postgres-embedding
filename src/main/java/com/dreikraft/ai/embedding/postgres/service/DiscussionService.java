@@ -1,7 +1,6 @@
 package com.dreikraft.ai.embedding.postgres.service;
 
 import com.dreikraft.ai.embedding.postgres.mapper.DiscussionEntityMapper;
-import com.dreikraft.ai.embedding.postgres.model.ArticleDocument;
 import com.dreikraft.ai.embedding.postgres.model.DiscussionCreateRequest;
 import com.dreikraft.ai.embedding.postgres.model.DiscussionDocument;
 import com.dreikraft.ai.embedding.postgres.model.ThreadedDiscussionItem;
@@ -25,22 +24,16 @@ public class DiscussionService {
     private final DiscussionJpaRepository discussionRepository;
     private final ArticleJpaRepository articleRepository;
     private final DiscussionEntityMapper discussionMapper;
-    private final DiscussionClassificationService discussionClassificationService;
-    private final EmbeddingTransformationService embeddingTransformationService;
-    private final DocumentVectorStoreService vectorStoreService;
+    private final DocumentIndexingJobService documentIndexingJobService;
 
     public DiscussionService(DiscussionJpaRepository discussionRepository,
                              ArticleJpaRepository articleRepository,
                              DiscussionEntityMapper discussionMapper,
-                             DiscussionClassificationService discussionClassificationService,
-                             EmbeddingTransformationService embeddingTransformationService,
-                             DocumentVectorStoreService vectorStoreService) {
+                             DocumentIndexingJobService documentIndexingJobService) {
         this.discussionRepository = discussionRepository;
         this.articleRepository = articleRepository;
         this.discussionMapper = discussionMapper;
-        this.discussionClassificationService = discussionClassificationService;
-        this.embeddingTransformationService = embeddingTransformationService;
-        this.vectorStoreService = vectorStoreService;
+        this.documentIndexingJobService = documentIndexingJobService;
     }
 
     public long create(DiscussionCreateRequest request) {
@@ -60,13 +53,13 @@ public class DiscussionService {
         }
 
         DiscussionEntity saved = discussionRepository.save(entity);
-        ArticleDocument article = findArticle(resolveArticleId(saved));
-
-        List<EmbeddingTransformationService.EmbeddingVariant> variants = embeddingTransformationService
-                .transformForDiscussion(article.title(), saved.getTitle(), saved.getContent());
-        vectorStoreService.upsertVariants(saved.getId(), "discussion", saved.getTitle(), variants, metadata(saved, resolveArticleId(saved)));
-
-        refreshDiscussionClassifications(resolveArticleId(saved));
+        long articleId = resolveArticleId(saved);
+        documentIndexingJobService.enqueue(DocumentIndexingJobService.JOB_TYPE_UPSERT_VECTOR, "discussion", saved.getId());
+        documentIndexingJobService.enqueue(
+                DocumentIndexingJobService.JOB_TYPE_REFRESH_DISCUSSION_CLASSIFICATION,
+                "article",
+                articleId
+        );
         return saved.getId();
     }
 
@@ -77,12 +70,12 @@ public class DiscussionService {
         DiscussionEntity saved = discussionRepository.save(discussion);
 
         long articleId = resolveArticleId(saved);
-        ArticleDocument article = findArticle(articleId);
-        List<EmbeddingTransformationService.EmbeddingVariant> variants = embeddingTransformationService
-                .transformForDiscussion(article.title(), saved.getTitle(), saved.getContent());
-        vectorStoreService.upsertVariants(saved.getId(), "discussion", saved.getTitle(), variants, metadata(saved, articleId));
-
-        refreshDiscussionClassifications(articleId);
+        documentIndexingJobService.enqueue(DocumentIndexingJobService.JOB_TYPE_UPSERT_VECTOR, "discussion", saved.getId());
+        documentIndexingJobService.enqueue(
+                DocumentIndexingJobService.JOB_TYPE_REFRESH_DISCUSSION_CLASSIFICATION,
+                "article",
+                articleId
+        );
     }
 
     @Transactional(readOnly = true)
@@ -107,33 +100,6 @@ public class DiscussionService {
     @Transactional(readOnly = true)
     public long count() {
         return discussionRepository.countDiscussions();
-    }
-
-    private void refreshDiscussionClassifications(long articleDocumentId) {
-        List<DiscussionDocument> discussions = findDiscussionsByArticleId(articleDocumentId);
-        if (discussions.isEmpty()) {
-            return;
-        }
-
-        ArticleDocument article = findArticle(articleDocumentId);
-        Map<Long, DiscussionClassificationService.DiscussionClassification> classifications =
-                discussionClassificationService.classify(new DiscussionClassificationService.DiscussionClassificationInput(
-                        article.title(),
-                        article.content(),
-                        discussions
-                ));
-
-        for (DiscussionDocument discussion : discussions) {
-            DiscussionClassificationService.DiscussionClassification classification = classifications.get(discussion.id());
-            DiscussionEntity entity = discussionRepository.findDiscussionById(discussion.id())
-                    .orElseThrow(() -> new IllegalStateException("Discussion missing during classification update: " + discussion.id()));
-            entity.setSentiment(classification == null ? "neutral" : classification.sentiment());
-            entity.setResponseDepth(classification == null ? "substantive" : classification.responseDepth());
-            entity.setClassificationStatus("completed");
-            entity.setClassificationSource("llm");
-            entity.setClassifiedAt(java.time.OffsetDateTime.now());
-            discussionRepository.save(entity);
-        }
     }
 
     private List<DiscussionDocument> findDiscussionsByArticleId(long articleDocumentId) {
@@ -181,22 +147,4 @@ public class DiscussionService {
         throw new IllegalStateException("Discussion does not resolve to an article: " + discussion.getId());
     }
 
-    private ArticleDocument findArticle(long id) {
-        ArticleEntity article = articleRepository.findArticleById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Article not found: " + id));
-        return new ArticleDocument(article.getId(), article.getTitle(), article.getContent(), article.getUpdatedAt());
-    }
-
-    private Map<String, Object> metadata(DiscussionEntity discussion, long articleId) {
-        Map<String, Object> metadata = new LinkedHashMap<>();
-        metadata.put("sampleType", "discussion");
-        metadata.put("relatedArticleDocumentId", articleId);
-        if (discussion.getParentDiscussion() != null) {
-            metadata.put("respondsToDocumentId", discussion.getParentDiscussion().getId());
-        }
-        if (discussion.getDiscussionSection() != null && !discussion.getDiscussionSection().isBlank()) {
-            metadata.put("discussionSection", discussion.getDiscussionSection());
-        }
-        return metadata;
-    }
 }
