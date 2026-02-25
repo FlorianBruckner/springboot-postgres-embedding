@@ -73,8 +73,15 @@ public class DocumentIndexingWorkerService {
     public void runQueue() {
         OffsetDateTime now = OffsetDateTime.now();
         List<DocumentIndexingJobRecord> dueJobs = jobRepository.pollDue(DocumentIndexingJobStatus.PENDING, now, batchSize);
+        if (dueJobs.isEmpty()) {
+            log.debug("No due indexing jobs found");
+            return;
+        }
+
+        log.info("Polled {} due indexing jobs", dueJobs.size());
         for (DocumentIndexingJobRecord job : dueJobs) {
             if (!jobRepository.claimPending(job.id(), now)) {
+                log.debug("Skipping job {} because claim failed", job.id());
                 continue;
             }
             processClaimedJob(job);
@@ -82,9 +89,12 @@ public class DocumentIndexingWorkerService {
     }
 
     private void processClaimedJob(DocumentIndexingJobRecord job) {
+        log.info("Processing job id={}, type={}, documentType={}, documentId={}, attempt={}/{}",
+                job.id(), job.jobType(), job.documentType(), job.documentId(), job.attempt() + 1, job.maxAttempts());
         try {
             dispatch(job);
             jobRepository.markSucceeded(job.id(), OffsetDateTime.now());
+            log.info("Job {} completed successfully", job.id());
         } catch (Exception ex) {
             handleFailure(job, ex);
         }
@@ -92,6 +102,7 @@ public class DocumentIndexingWorkerService {
 
     private void dispatch(DocumentIndexingJobRecord job) {
         DocumentIndexingJobType jobType = parseJobType(job.jobType());
+        log.debug("Dispatching job {} as {}", job.id(), jobType);
         switch (jobType) {
             case EMBED_UPSERT -> processEmbedUpsert(job.documentType(), job.documentId());
             case DISCUSSION_CLASSIFY -> processDiscussionClassify(job.documentType(), job.documentId());
@@ -120,10 +131,12 @@ public class DocumentIndexingWorkerService {
             throw new PermanentJobFailureException("DISCUSSION_CLASSIFY expects article document_type but got: " + documentType);
         }
 
+        log.info("Starting discussion classification for article {}", documentId);
         ArticleEntity article = articleRepository.findArticleById(documentId)
                 .orElseThrow(() -> new PermanentJobFailureException("Article not found: " + documentId));
         List<DiscussionEntity> discussions = flattenDiscussionTree(documentId);
         if (discussions.isEmpty()) {
+            log.info("No discussions to classify for article {}", documentId);
             return;
         }
 
@@ -151,9 +164,11 @@ public class DocumentIndexingWorkerService {
             discussion.setClassifiedAt(now);
         }
         discussionRepository.saveAll(discussions);
+        log.info("Completed classification for article {} with {} discussion items", documentId, discussions.size());
     }
 
     private void embedArticle(long articleId) {
+        log.info("Starting embedding upsert for article {}", articleId);
         ArticleEntity article = articleRepository.findArticleById(articleId)
                 .orElseThrow(() -> new PermanentJobFailureException("Article not found: " + articleId));
 
@@ -171,9 +186,11 @@ public class DocumentIndexingWorkerService {
         article.setEmbeddingModel(embeddingModel);
         article.setEmbeddedAt(OffsetDateTime.now());
         articleRepository.save(article);
+        log.info("Completed embedding upsert for article {} with {} variants", articleId, variants.size());
     }
 
     private void embedDiscussion(long discussionId) {
+        log.info("Starting embedding upsert for discussion {}", discussionId);
         DiscussionEntity discussion = discussionRepository.findDiscussionById(discussionId)
                 .orElseThrow(() -> new PermanentJobFailureException("Discussion not found: " + discussionId));
 
@@ -196,6 +213,7 @@ public class DocumentIndexingWorkerService {
         discussion.setEmbeddingModel(embeddingModel);
         discussion.setEmbeddedAt(OffsetDateTime.now());
         discussionRepository.save(discussion);
+        log.info("Completed embedding upsert for discussion {} with {} variants", discussionId, variants.size());
     }
 
     private List<DiscussionEntity> flattenDiscussionTree(long articleDocumentId) {
@@ -234,6 +252,7 @@ public class DocumentIndexingWorkerService {
         if (content.length() < summarizeThresholdChars) {
             return content;
         }
+        log.debug("Summarizing content for embedding title={} length={} threshold={}", title, content.length(), summarizeThresholdChars);
         return semanticSummaryService.summarizeDocumentForEmbedding(title, content);
     }
 
@@ -247,6 +266,7 @@ public class DocumentIndexingWorkerService {
             }
         }
 
+        log.error("Marking job {} as dead-letter after failure: {}", job.id(), message);
         jobRepository.markDeadLetter(job.id(), OffsetDateTime.now(), message);
         log.error("Moved job {} to dead-letter after failure: {}", job.id(), message, ex);
     }
