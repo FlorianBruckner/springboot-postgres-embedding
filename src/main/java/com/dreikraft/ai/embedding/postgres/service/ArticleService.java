@@ -5,12 +5,14 @@ import com.dreikraft.ai.embedding.postgres.model.ArticleCreateRequest;
 import com.dreikraft.ai.embedding.postgres.model.ArticleDocument;
 import com.dreikraft.ai.embedding.postgres.persistence.entity.ArticleEntity;
 import com.dreikraft.ai.embedding.postgres.persistence.repository.ArticleJpaRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -25,17 +27,23 @@ public class ArticleService {
     private final SemanticSummaryService semanticSummaryService;
     private final DocumentVectorStoreService vectorStoreService;
     private final DocumentIndexingJobService documentIndexingJobService;
+    private final boolean queryRewriteEnabled;
+    private final boolean dualQueryEnabled;
 
     public ArticleService(ArticleJpaRepository articleRepository,
                           ArticleEntityMapper articleMapper,
                           SemanticSummaryService semanticSummaryService,
                           DocumentVectorStoreService vectorStoreService,
-                          DocumentIndexingJobService documentIndexingJobService) {
+                          DocumentIndexingJobService documentIndexingJobService,
+                          @Value("${app.semantic-search.query-rewrite.enabled:true}") boolean queryRewriteEnabled,
+                          @Value("${app.semantic-search.dual-query.enabled:false}") boolean dualQueryEnabled) {
         this.articleRepository = articleRepository;
         this.articleMapper = articleMapper;
         this.semanticSummaryService = semanticSummaryService;
         this.vectorStoreService = vectorStoreService;
         this.documentIndexingJobService = documentIndexingJobService;
+        this.queryRewriteEnabled = queryRewriteEnabled;
+        this.dualQueryEnabled = dualQueryEnabled;
     }
 
     public long create(ArticleCreateRequest request) {
@@ -76,8 +84,16 @@ public class ArticleService {
 
     @Transactional(readOnly = true)
     public List<ArticleDocument> semanticSearch(String query, String filterExpression) {
-        String summarizedQuery = semanticSummaryService.summarizeQueryForSemanticSearch(query);
-        List<Long> ids = vectorStoreService.searchIds(summarizedQuery, 20, filterExpression);
+        String rewrittenQuery = queryRewriteEnabled
+                ? semanticSummaryService.summarizeQueryForSemanticSearch(query)
+                : query;
+
+        List<Long> ids = dualQueryEnabled
+                ? mergeRankedIds(
+                vectorStoreService.searchIds(query, 20, filterExpression),
+                vectorStoreService.searchIds(rewrittenQuery, 20, filterExpression)
+        )
+                : vectorStoreService.searchIds(rewrittenQuery, 20, filterExpression);
         if (ids.isEmpty()) {
             return List.of();
         }
@@ -88,6 +104,13 @@ public class ArticleService {
                 .collect(Collectors.toMap(ArticleDocument::id, article -> article));
 
         return ids.stream().map(byId::get).filter(java.util.Objects::nonNull).toList();
+    }
+
+    private List<Long> mergeRankedIds(List<Long> originalQueryIds, List<Long> rewrittenQueryIds) {
+        LinkedHashSet<Long> merged = new LinkedHashSet<>();
+        merged.addAll(originalQueryIds);
+        merged.addAll(rewrittenQueryIds);
+        return List.copyOf(merged);
     }
 
     @Transactional(readOnly = true)

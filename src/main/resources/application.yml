@@ -3,6 +3,10 @@ app:
     vendor: postgres
   semantic-search:
     similarity-threshold: 0.5
+    query-rewrite:
+      enabled: true
+    dual-query:
+      enabled: false
   document-indexing:
     worker:
       fixed-delay-ms: 1000
