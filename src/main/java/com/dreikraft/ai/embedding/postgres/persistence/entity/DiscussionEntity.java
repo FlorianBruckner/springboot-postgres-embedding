@@ -1,11 +1,31 @@
 package com.dreikraft.ai.embedding.postgres.persistence.entity;
 
-import jakarta.persistence.*;
+import com.dreikraft.ai.embedding.postgres.service.ClassificationStatus;
+import com.dreikraft.ai.embedding.postgres.service.EmbeddingStatus;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+@Getter
+@Setter
 @Entity
 @Table(name = "discussion_documents")
 public class DiscussionEntity {
@@ -43,14 +63,31 @@ public class DiscussionEntity {
     @Column(name = "classified_at")
     private OffsetDateTime classifiedAt;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "classification_status", length = 32)
-    private String classificationStatus;
+    private ClassificationStatus classificationStatus;
 
     @Column(name = "sentiment_confidence")
     private Double sentimentConfidence;
 
     @Column(name = "classification_source", length = 64)
     private String classificationSource;
+
+    @Column(name = "embedded_at")
+    private OffsetDateTime embeddedAt;
+
+    @Column(name = "embedding_content_hash")
+    private String embeddingContentHash;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "embedding_status", length = 32)
+    private EmbeddingStatus embeddingStatus;
+
+    @Column(name = "embedding_source", length = 64)
+    private String embeddingSource;
+
+    @Column(name = "embedding_model", length = 128)
+    private String embeddingModel;
 
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
@@ -74,33 +111,4 @@ public class DiscussionEntity {
     public Long getParentDocumentId() {
         return parentDiscussion == null ? null : parentDiscussion.getId();
     }
-
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public String getTitle() { return title; }
-    public void setTitle(String title) { this.title = title; }
-    public String getContent() { return content; }
-    public void setContent(String content) { this.content = content; }
-    public ArticleEntity getArticle() { return article; }
-    public void setArticle(ArticleEntity article) { this.article = article; }
-    public DiscussionEntity getParentDiscussion() { return parentDiscussion; }
-    public void setParentDiscussion(DiscussionEntity parentDiscussion) { this.parentDiscussion = parentDiscussion; }
-    public List<DiscussionEntity> getResponses() { return responses; }
-    public void setResponses(List<DiscussionEntity> responses) { this.responses = responses; }
-    public String getDiscussionSection() { return discussionSection; }
-    public void setDiscussionSection(String discussionSection) { this.discussionSection = discussionSection; }
-    public String getSentiment() { return sentiment; }
-    public void setSentiment(String sentiment) { this.sentiment = sentiment; }
-    public String getResponseDepth() { return responseDepth; }
-    public void setResponseDepth(String responseDepth) { this.responseDepth = responseDepth; }
-    public OffsetDateTime getClassifiedAt() { return classifiedAt; }
-    public void setClassifiedAt(OffsetDateTime classifiedAt) { this.classifiedAt = classifiedAt; }
-    public String getClassificationStatus() { return classificationStatus; }
-    public void setClassificationStatus(String classificationStatus) { this.classificationStatus = classificationStatus; }
-    public Double getSentimentConfidence() { return sentimentConfidence; }
-    public void setSentimentConfidence(Double sentimentConfidence) { this.sentimentConfidence = sentimentConfidence; }
-    public String getClassificationSource() { return classificationSource; }
-    public void setClassificationSource(String classificationSource) { this.classificationSource = classificationSource; }
-    public OffsetDateTime getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(OffsetDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

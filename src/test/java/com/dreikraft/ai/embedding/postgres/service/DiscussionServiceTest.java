@@ -43,10 +43,10 @@ class DiscussionServiceTest {
 
         service.create(new DiscussionCreateRequest("Comment", "Text", 1L, null, "section"));
 
-        verify(documentIndexingJobService).enqueue(DocumentIndexingJobService.JOB_TYPE_UPSERT_VECTOR, "discussion", 11L);
+        verify(documentIndexingJobService).enqueue(DocumentIndexingJobType.EMBED_UPSERT, DocumentType.DISCUSSION, 11L);
         verify(documentIndexingJobService).enqueue(
-                DocumentIndexingJobService.JOB_TYPE_REFRESH_DISCUSSION_CLASSIFICATION,
-                "article",
+                DocumentIndexingJobType.DISCUSSION_CLASSIFY,
+                DocumentType.ARTICLE,
                 1L
         );
     }

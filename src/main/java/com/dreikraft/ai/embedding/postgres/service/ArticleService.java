@@ -43,7 +43,7 @@ public class ArticleService {
         entity.setTitle(request.title());
         entity.setContent(request.content());
         ArticleEntity saved = articleRepository.save(entity);
-        documentIndexingJobService.enqueue(DocumentIndexingJobService.JOB_TYPE_UPSERT_VECTOR, "article", saved.getId());
+        documentIndexingJobService.enqueue(DocumentIndexingJobType.EMBED_UPSERT, DocumentType.ARTICLE, saved.getId());
         return saved.getId();
     }
 
@@ -54,7 +54,7 @@ public class ArticleService {
         entity.setContentHash(hashContent(content));
         entity.setEmbeddedAt(null);
         articleRepository.save(entity);
-        documentIndexingJobService.enqueue(DocumentIndexingJobService.JOB_TYPE_UPSERT_VECTOR, "article", id);
+        documentIndexingJobService.enqueue(DocumentIndexingJobType.EMBED_UPSERT, DocumentType.ARTICLE, id);
     }
 
     @Transactional(readOnly = true)

@@ -34,6 +34,6 @@ class ArticleServiceTest {
 
         service.create(new ArticleCreateRequest("Article", "Raw body"));
 
-        verify(documentIndexingJobService).enqueue(DocumentIndexingJobService.JOB_TYPE_UPSERT_VECTOR, "article", 5L);
+        verify(documentIndexingJobService).enqueue(DocumentIndexingJobType.EMBED_UPSERT, DocumentType.ARTICLE, 5L);
     }
 }

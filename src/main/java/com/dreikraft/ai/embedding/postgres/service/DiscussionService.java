@@ -54,10 +54,10 @@ public class DiscussionService {
 
         DiscussionEntity saved = discussionRepository.save(entity);
         long articleId = resolveArticleId(saved);
-        documentIndexingJobService.enqueue(DocumentIndexingJobService.JOB_TYPE_UPSERT_VECTOR, "discussion", saved.getId());
+        documentIndexingJobService.enqueue(DocumentIndexingJobType.EMBED_UPSERT, DocumentType.DISCUSSION, saved.getId());
         documentIndexingJobService.enqueue(
-                DocumentIndexingJobService.JOB_TYPE_REFRESH_DISCUSSION_CLASSIFICATION,
-                "article",
+                DocumentIndexingJobType.DISCUSSION_CLASSIFY,
+                DocumentType.ARTICLE,
                 articleId
         );
         return saved.getId();
@@ -70,10 +70,10 @@ public class DiscussionService {
         DiscussionEntity saved = discussionRepository.save(discussion);
 
         long articleId = resolveArticleId(saved);
-        documentIndexingJobService.enqueue(DocumentIndexingJobService.JOB_TYPE_UPSERT_VECTOR, "discussion", saved.getId());
+        documentIndexingJobService.enqueue(DocumentIndexingJobType.EMBED_UPSERT, DocumentType.DISCUSSION, saved.getId());
         documentIndexingJobService.enqueue(
-                DocumentIndexingJobService.JOB_TYPE_REFRESH_DISCUSSION_CLASSIFICATION,
-                "article",
+                DocumentIndexingJobType.DISCUSSION_CLASSIFY,
+                DocumentType.ARTICLE,
                 articleId
         );
     }

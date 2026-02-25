@@ -3,6 +3,12 @@ app:
     vendor: postgres
   semantic-search:
     similarity-threshold: 0.5
+  document-indexing:
+    worker:
+      fixed-delay-ms: 1000
+      batch-size: 10
+      base-backoff-ms: 2000
+      summarize-threshold-chars: 1200
 
 spring:
   datasource:
