@@ -11,7 +11,7 @@ import com.dreikraft.ai.embedding.postgres.persistence.repository.ArticleJpaRepo
 import com.dreikraft.ai.embedding.postgres.persistence.repository.DiscussionJpaRepository;
 import com.dreikraft.ai.embedding.postgres.repository.DocumentRepository;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Repository;
+import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
@@ -25,7 +25,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-@Repository
+@Component
 @Transactional
 @ConditionalOnProperty(prefix = "app.database", name = "vendor", havingValue = "postgres", matchIfMissing = true)
 public class PostgresDocumentRepository implements DocumentRepository {
