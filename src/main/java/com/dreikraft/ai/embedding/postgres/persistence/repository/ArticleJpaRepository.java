@@ -12,28 +12,22 @@ public interface ArticleJpaRepository extends JpaRepository<ArticleEntity, Long>
 
     @Query(value = """
             SELECT *
-            FROM documents
-            WHERE article_document_id IS NULL
-              AND parent_document_id IS NULL
-              AND id = :id
+            FROM article_documents
+            WHERE id = :id
             """, nativeQuery = true)
     Optional<ArticleEntity> findArticleById(@Param("id") Long id);
 
     @Query(value = """
             SELECT *
-            FROM documents
-            WHERE article_document_id IS NULL
-              AND parent_document_id IS NULL
-              AND id IN (:ids)
+            FROM article_documents
+            WHERE id IN (:ids)
             """, nativeQuery = true)
     List<ArticleEntity> findArticlesByIdIn(@Param("ids") List<Long> ids);
 
     @Query(value = """
             SELECT *
-            FROM documents
-            WHERE article_document_id IS NULL
-              AND parent_document_id IS NULL
-              AND to_tsvector('english', title || ' ' || content) @@ plainto_tsquery('english', :term)
+            FROM article_documents
+            WHERE to_tsvector('english', title || ' ' || content) @@ plainto_tsquery('english', :term)
             ORDER BY updated_at DESC
             LIMIT :limit
             """, nativeQuery = true)
@@ -41,18 +35,14 @@ public interface ArticleJpaRepository extends JpaRepository<ArticleEntity, Long>
 
     @Query(value = """
             SELECT COUNT(*)
-            FROM documents
-            WHERE article_document_id IS NULL
-              AND parent_document_id IS NULL
+            FROM article_documents
             """, nativeQuery = true)
     long countArticles();
 
     @Query(value = """
             SELECT COUNT(*)
-            FROM documents
-            WHERE article_document_id IS NULL
-              AND parent_document_id IS NULL
-              AND id = :id
+            FROM article_documents
+            WHERE id = :id
             """, nativeQuery = true)
     long countArticleById(@Param("id") long id);
 }

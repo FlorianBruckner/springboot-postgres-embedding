@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "documents")
+@Table(name = "discussion_documents")
 public class DiscussionEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -20,11 +20,11 @@ public class DiscussionEntity {
     private String content;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "article_document_id")
+    @JoinColumn(name = "article_id")
     private ArticleEntity article;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "parent_document_id")
+    @JoinColumn(name = "parent_discussion_id")
     private DiscussionEntity parentDiscussion;
 
     @OneToMany(mappedBy = "parentDiscussion", fetch = FetchType.LAZY)

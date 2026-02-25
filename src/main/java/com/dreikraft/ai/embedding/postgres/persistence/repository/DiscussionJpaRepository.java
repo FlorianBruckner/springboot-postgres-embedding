@@ -12,17 +12,15 @@ public interface DiscussionJpaRepository extends JpaRepository<DiscussionEntity,
 
     @Query(value = """
             SELECT *
-            FROM documents
-            WHERE (article_document_id IS NOT NULL OR parent_document_id IS NOT NULL)
-              AND id = :id
+            FROM discussion_documents
+            WHERE id = :id
             """, nativeQuery = true)
     Optional<DiscussionEntity> findDiscussionById(@Param("id") Long id);
 
     @Query(value = """
             SELECT *
-            FROM documents
-            WHERE (article_document_id IS NOT NULL OR parent_document_id IS NOT NULL)
-              AND to_tsvector('english', title || ' ' || content) @@ plainto_tsquery('english', :term)
+            FROM discussion_documents
+            WHERE to_tsvector('english', title || ' ' || content) @@ plainto_tsquery('english', :term)
             ORDER BY updated_at DESC
             LIMIT :limit
             """, nativeQuery = true)
@@ -30,18 +28,16 @@ public interface DiscussionJpaRepository extends JpaRepository<DiscussionEntity,
 
     @Query(value = """
             SELECT *
-            FROM documents
-            WHERE article_document_id = :articleDocumentId
-              AND parent_document_id IS NULL
+            FROM discussion_documents
+            WHERE article_id = :articleDocumentId
+              AND parent_discussion_id IS NULL
             ORDER BY id
             """, nativeQuery = true)
     List<DiscussionEntity> findRootDiscussionsByArticleDocumentIdOrderByIdAsc(@Param("articleDocumentId") Long articleDocumentId);
 
     @Query(value = """
             SELECT COUNT(*)
-            FROM documents
-            WHERE (article_document_id IS NOT NULL OR parent_document_id IS NOT NULL)
+            FROM discussion_documents
             """, nativeQuery = true)
     long countDiscussions();
 }
-
