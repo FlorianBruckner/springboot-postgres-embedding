@@ -1,16 +1,14 @@
 package com.dreikraft.ai.embedding.postgres.service;
 
 import com.dreikraft.ai.embedding.postgres.repository.DocumentIndexingJobRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.OffsetDateTime;
 
 @Service
+@Slf4j
 public class DocumentIndexingJobService {
-
-    private static final Logger log = LoggerFactory.getLogger(DocumentIndexingJobService.class);
     private static final int DEFAULT_MAX_ATTEMPTS = 5;
 
     private final DocumentIndexingJobRepository repository;

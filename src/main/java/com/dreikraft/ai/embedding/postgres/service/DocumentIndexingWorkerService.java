@@ -7,8 +7,7 @@ import com.dreikraft.ai.embedding.postgres.persistence.repository.DiscussionJpaR
 import com.dreikraft.ai.embedding.postgres.repository.DocumentIndexingJobRecord;
 import com.dreikraft.ai.embedding.postgres.repository.DocumentIndexingJobRepository;
 import com.dreikraft.ai.embedding.postgres.repository.DocumentIndexingJobStatus;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -27,8 +26,8 @@ import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
 @Service
+@Slf4j
 public class DocumentIndexingWorkerService {
-    private static final Logger log = LoggerFactory.getLogger(DocumentIndexingWorkerService.class);
 
     private final DocumentIndexingJobRepository jobRepository;
     private final ArticleJpaRepository articleRepository;
