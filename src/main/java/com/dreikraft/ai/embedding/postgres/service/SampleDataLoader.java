@@ -1,6 +1,7 @@
 package com.dreikraft.ai.embedding.postgres.service;
 
-import com.dreikraft.ai.embedding.postgres.model.DocumentCreateRequest;
+import com.dreikraft.ai.embedding.postgres.model.ArticleCreateRequest;
+import com.dreikraft.ai.embedding.postgres.model.DiscussionCreateRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,19 +24,22 @@ import java.util.Map;
 public class SampleDataLoader implements ApplicationRunner {
     private static final int SAMPLE_SIZE = 1000;
 
-    private final DocumentService documentService;
+    private final ArticleService articleService;
+    private final DiscussionService discussionService;
     private final WikipediaClient wikipediaClient;
     private final ObjectMapper objectMapper;
     private final Path cacheFile;
 
     public SampleDataLoader(
-            DocumentService documentService,
+            ArticleService articleService,
+            DiscussionService discussionService,
             WikipediaClient wikipediaClient,
             ObjectMapper objectMapper,
             @Value("${sample-loader.directory:sampledata}") String sampleDataDirectory,
             @Value("${sample-loader.file-name:articles.json}") String sampleDataFileName
     ) {
-        this.documentService = documentService;
+        this.articleService = articleService;
+        this.discussionService = discussionService;
         this.wikipediaClient = wikipediaClient;
         this.objectMapper = objectMapper;
         this.cacheFile = Path.of(sampleDataDirectory, sampleDataFileName);
@@ -43,7 +47,7 @@ public class SampleDataLoader implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        if (documentService.count() > 0) {
+        if (articleService.count() + discussionService.count() > 0) {
             log.info("Skipping sample data loading because documents already exist.");
             return;
         }
@@ -67,34 +71,25 @@ public class SampleDataLoader implements ApplicationRunner {
         for (CachedArticleBundle articleBundle : cachedSampleData.articleBundles()) {
             processedBundles++;
             log.info("Persisting article bundle {}/{}: {}", processedBundles, totalBundles, articleBundle.article().title());
-            long articleDocumentId = documentService.create(new DocumentCreateRequest(
+            long articleDocumentId = articleService.create(new ArticleCreateRequest(
                     articleBundle.article().title(),
-                    articleBundle.article().extract(),
-                    Map.of("sampleType", "article", "articleTitle", articleBundle.article().title())
+                    articleBundle.article().extract()
             ));
 
             Map<String, Long> discussionIdToDocumentId = new HashMap<>();
             log.info("Persisting {} discussion items for article '{}'", articleBundle.discussionItems().size(), articleBundle.article().title());
             for (WikipediaClient.WikipediaDiscussionItem item : articleBundle.discussionItems()) {
-                Map<String, Object> properties = new HashMap<>();
-                properties.put("sampleType", "discussion");
-                properties.put("articleTitle", articleBundle.article().title());
-                properties.put("relatedArticleDocumentId", articleDocumentId);
-                properties.put("discussionItemId", item.itemId());
-                properties.put("discussionSection", item.section());
-
+                Long parentDocumentId = null;
                 if (item.parentItemId() != null) {
-                    properties.put("parentDiscussionItemId", item.parentItemId());
-                    Long parentDocumentId = discussionIdToDocumentId.get(item.parentItemId());
-                    if (parentDocumentId != null) {
-                        properties.put("respondsToDocumentId", parentDocumentId);
-                    }
+                    parentDocumentId = discussionIdToDocumentId.get(item.parentItemId());
                 }
 
-                long discussionDocumentId = documentService.create(new DocumentCreateRequest(
+                long discussionDocumentId = discussionService.create(new DiscussionCreateRequest(
                         "%s - Diskussion %s".formatted(articleBundle.article().title(), item.itemId()),
                         item.text(),
-                        properties
+                        articleDocumentId,
+                        parentDocumentId,
+                        item.section()
                 ));
                 discussionIdToDocumentId.put(item.itemId(), discussionDocumentId);
             }

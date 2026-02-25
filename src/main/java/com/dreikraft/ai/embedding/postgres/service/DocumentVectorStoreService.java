@@ -6,6 +6,7 @@ import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -33,30 +34,23 @@ public class DocumentVectorStoreService {
         this.similarityThreshold = similarityThreshold;
     }
 
-    public void upsert(long id, String title, String content, Map<String, Object> additionalProperties) {
-        Map<String, Object> metadata = new LinkedHashMap<>();
-        metadata.put("title", title);
-
-        String sampleType = "generic";
-        if (additionalProperties != null) {
-            for (String key : ALLOWED_METADATA_KEYS) {
-                Object value = additionalProperties.get(key);
-                if (value != null) {
-                    metadata.put(key, value);
-                }
-            }
-            Object rawType = additionalProperties.get("sampleType");
-            if (rawType != null && !rawType.toString().isBlank()) {
-                sampleType = rawType.toString();
-            }
+    public void upsertVariants(long id,
+                               String entityType,
+                               String title,
+                               List<EmbeddingTransformationService.EmbeddingVariant> variants,
+                               Map<String, Object> additionalProperties) {
+        if (variants == null || variants.isEmpty()) {
+            return;
         }
 
-        metadata.put(ENTITY_ID_KEY, id);
-        metadata.put(ENTITY_TYPE_KEY, sampleType);
-
-        String vectorDocumentId = sampleType + ":" + id + ":0";
-        Document document = new Document(vectorDocumentId, content, metadata);
-        vectorStore.add(List.of(document));
+        List<Document> vectorDocuments = new ArrayList<>();
+        for (int i = 0; i < variants.size(); i++) {
+            EmbeddingTransformationService.EmbeddingVariant variant = variants.get(i);
+            Map<String, Object> metadata = buildMetadata(id, entityType, title, additionalProperties, variant.label());
+            String vectorDocumentId = entityType + ":" + id + ":" + i;
+            vectorDocuments.add(new Document(vectorDocumentId, variant.content(), metadata));
+        }
+        vectorStore.add(vectorDocuments);
     }
 
     public List<Long> searchIds(String query, int limit, String filterExpression) {
@@ -79,8 +73,27 @@ public class DocumentVectorStoreService {
                 ));
     }
 
-    public void delete(long id) {
-        vectorStore.delete(List.of("article:" + id + ":0", "discussion:" + id + ":0", "generic:" + id + ":0"));
+    private Map<String, Object> buildMetadata(long id,
+                                              String entityType,
+                                              String title,
+                                              Map<String, Object> additionalProperties,
+                                              String variantLabel) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("title", title);
+
+        if (additionalProperties != null) {
+            for (String key : ALLOWED_METADATA_KEYS) {
+                Object value = additionalProperties.get(key);
+                if (value != null) {
+                    metadata.put(key, value);
+                }
+            }
+        }
+
+        metadata.put("embeddingVariant", variantLabel == null ? "variant" : variantLabel);
+        metadata.put(ENTITY_ID_KEY, id);
+        metadata.put(ENTITY_TYPE_KEY, entityType);
+        return metadata;
     }
 
     private Long toLong(Object value) {

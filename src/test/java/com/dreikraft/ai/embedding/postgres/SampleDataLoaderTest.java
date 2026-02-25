@@ -1,7 +1,9 @@
 package com.dreikraft.ai.embedding.postgres;
 
-import com.dreikraft.ai.embedding.postgres.model.DocumentCreateRequest;
-import com.dreikraft.ai.embedding.postgres.service.DocumentService;
+import com.dreikraft.ai.embedding.postgres.model.ArticleCreateRequest;
+import com.dreikraft.ai.embedding.postgres.model.DiscussionCreateRequest;
+import com.dreikraft.ai.embedding.postgres.service.ArticleService;
+import com.dreikraft.ai.embedding.postgres.service.DiscussionService;
 import com.dreikraft.ai.embedding.postgres.service.SampleDataLoader;
 import com.dreikraft.ai.embedding.postgres.service.WikipediaClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -30,9 +32,11 @@ class SampleDataLoaderTest {
 
     @Test
     void shouldLoadFromPersistedSampleDataBeforeFetchingWikipedia() throws Exception {
-        DocumentService documentService = mock(DocumentService.class);
+        ArticleService articleService = mock(ArticleService.class);
+        DiscussionService discussionService = mock(DiscussionService.class);
         WikipediaClient wikipediaClient = mock(WikipediaClient.class);
-        when(documentService.count()).thenReturn(0L);
+        when(articleService.count()).thenReturn(0L);
+        when(discussionService.count()).thenReturn(0L);
 
         Path sampleDir = tempDir.resolve("sampledata");
         Files.createDirectories(sampleDir);
@@ -46,10 +50,12 @@ class SampleDataLoaderTest {
         ));
         new ObjectMapper().writerWithDefaultPrettyPrinter().writeValue(cacheFile.toFile(), persistedData);
 
-        when(documentService.create(any(DocumentCreateRequest.class))).thenReturn(11L, 12L);
+        when(articleService.create(any(ArticleCreateRequest.class))).thenReturn(11L);
+        when(discussionService.create(any(DiscussionCreateRequest.class))).thenReturn(12L);
 
         SampleDataLoader loader = new SampleDataLoader(
-                documentService,
+                articleService,
+                discussionService,
                 wikipediaClient,
                 new ObjectMapper(),
                 sampleDir.toString(),
@@ -60,14 +66,17 @@ class SampleDataLoaderTest {
 
         verify(wikipediaClient, never()).fetchRandomGermanArticles(any(Integer.class));
         verify(wikipediaClient, never()).fetchDiscussionItems(any(String.class));
-        verify(documentService, times(2)).create(any(DocumentCreateRequest.class));
+        verify(articleService, times(1)).create(any(ArticleCreateRequest.class));
+        verify(discussionService, times(1)).create(any(DiscussionCreateRequest.class));
     }
 
     @Test
     void shouldFetchArticleAndDiscussionsAndPersistWhenNoSampleDataIsCached() throws Exception {
-        DocumentService documentService = mock(DocumentService.class);
+        ArticleService articleService = mock(ArticleService.class);
+        DiscussionService discussionService = mock(DiscussionService.class);
         WikipediaClient wikipediaClient = mock(WikipediaClient.class);
-        when(documentService.count()).thenReturn(0L);
+        when(articleService.count()).thenReturn(0L);
+        when(discussionService.count()).thenReturn(0L);
 
         Path sampleDir = tempDir.resolve("sampledata");
         List<WikipediaClient.WikipediaArticle> freshArticles = List.of(
@@ -80,10 +89,12 @@ class SampleDataLoaderTest {
 
         when(wikipediaClient.fetchRandomGermanArticles(any(Integer.class))).thenReturn(freshArticles);
         when(wikipediaClient.fetchDiscussionItems(eq("Fetched title"))).thenReturn(discussions);
-        when(documentService.create(any(DocumentCreateRequest.class))).thenReturn(21L, 22L, 23L);
+        when(articleService.create(any(ArticleCreateRequest.class))).thenReturn(21L);
+        when(discussionService.create(any(DiscussionCreateRequest.class))).thenReturn(22L, 23L);
 
         SampleDataLoader loader = new SampleDataLoader(
-                documentService,
+                articleService,
+                discussionService,
                 wikipediaClient,
                 new ObjectMapper(),
                 sampleDir.toString(),
@@ -94,7 +105,8 @@ class SampleDataLoaderTest {
 
         verify(wikipediaClient, times(1)).fetchRandomGermanArticles(any(Integer.class));
         verify(wikipediaClient, times(1)).fetchDiscussionItems(eq("Fetched title"));
-        verify(documentService, times(3)).create(any(DocumentCreateRequest.class));
+        verify(articleService, times(1)).create(any(ArticleCreateRequest.class));
+        verify(discussionService, times(2)).create(any(DiscussionCreateRequest.class));
 
         Path cacheFile = sampleDir.resolve("articles.json");
         assertTrue(Files.exists(cacheFile));

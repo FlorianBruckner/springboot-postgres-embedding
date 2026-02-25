@@ -8,16 +8,16 @@ import java.util.List;
 
 @Service
 public class RagService {
-    private final DocumentService documentService;
+    private final ArticleService articleService;
     private final ChatClient chatClient;
 
-    public RagService(DocumentService documentService, ChatClient.Builder chatClientBuilder) {
-        this.documentService = documentService;
+    public RagService(ArticleService articleService, ChatClient.Builder chatClientBuilder) {
+        this.articleService = articleService;
         this.chatClient = chatClientBuilder.build();
     }
 
     public String answer(String question) {
-        List<ArticleDocument> references = documentService.semanticSearch(question, DocumentService.ARTICLE_FILTER_EXPRESSION);
+        List<ArticleDocument> references = articleService.semanticSearch(question, ArticleService.ARTICLE_FILTER_EXPRESSION);
         StringBuilder context = new StringBuilder();
         for (ArticleDocument reference : references) {
             context.append("Title: ").append(reference.title()).append('\n')

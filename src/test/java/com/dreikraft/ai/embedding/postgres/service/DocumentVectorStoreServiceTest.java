@@ -37,11 +37,14 @@ class DocumentVectorStoreServiceTest {
     }
 
     @Test
-    void upsertKeepsOnlyMetadataUsedForVectorQueriesAndStoresEntityReference() {
+    void upsertVariantsStoresMultipleEmbeddingDocumentsPerEntity() {
         VectorStore vectorStore = mock(VectorStore.class);
         DocumentVectorStoreService service = new DocumentVectorStoreService(vectorStore, 0.75);
 
-        service.upsert(7L, "A title", "A body", Map.of(
+        service.upsertVariants(7L, "article", "A title", List.of(
+                new EmbeddingTransformationService.EmbeddingVariant("original", "A body"),
+                new EmbeddingTransformationService.EmbeddingVariant("keywords", "a, body")
+        ), Map.of(
                 "sampleType", "article",
                 "discussionItemId", "x-1",
                 "relatedArticleDocumentId", 1L
@@ -49,13 +52,16 @@ class DocumentVectorStoreServiceTest {
 
         ArgumentCaptor<List<Document>> addedDocumentsCaptor = ArgumentCaptor.forClass(List.class);
         verify(vectorStore).add(addedDocumentsCaptor.capture());
-        Document added = addedDocumentsCaptor.getValue().getFirst();
+        List<Document> added = addedDocumentsCaptor.getValue();
 
-        assertEquals("article:7:0", added.getId());
-        assertEquals("article", added.getMetadata().get("sampleType"));
-        assertEquals(1L, added.getMetadata().get("relatedArticleDocumentId"));
-        assertEquals(7L, added.getMetadata().get("entityId"));
-        assertEquals("article", added.getMetadata().get("entityType"));
-        assertFalse(added.getMetadata().containsKey("discussionItemId"));
+        assertEquals(2, added.size());
+        assertEquals("article:7:0", added.get(0).getId());
+        assertEquals("article:7:1", added.get(1).getId());
+        assertEquals("article", added.get(0).getMetadata().get("sampleType"));
+        assertEquals(1L, added.get(0).getMetadata().get("relatedArticleDocumentId"));
+        assertEquals(7L, added.get(0).getMetadata().get("entityId"));
+        assertEquals("article", added.get(0).getMetadata().get("entityType"));
+        assertEquals("original", added.get(0).getMetadata().get("embeddingVariant"));
+        assertFalse(added.get(0).getMetadata().containsKey("discussionItemId"));
     }
 }

@@ -2,7 +2,8 @@ package com.dreikraft.ai.embedding.postgres.controller;
 
 import com.dreikraft.ai.embedding.postgres.model.ArticleDocument;
 import com.dreikraft.ai.embedding.postgres.model.ThreadedDiscussionItem;
-import com.dreikraft.ai.embedding.postgres.service.DocumentService;
+import com.dreikraft.ai.embedding.postgres.service.ArticleService;
+import com.dreikraft.ai.embedding.postgres.service.DiscussionService;
 import com.dreikraft.ai.embedding.postgres.service.RagService;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -15,11 +16,13 @@ import java.util.Map;
 
 @Controller
 public class ViewController {
-    private final DocumentService documentService;
+    private final ArticleService articleService;
+    private final DiscussionService discussionService;
     private final RagService ragService;
 
-    public ViewController(DocumentService documentService, RagService ragService) {
-        this.documentService = documentService;
+    public ViewController(ArticleService articleService, DiscussionService discussionService, RagService ragService) {
+        this.articleService = articleService;
+        this.discussionService = discussionService;
         this.ragService = ragService;
     }
 
@@ -33,21 +36,21 @@ public class ViewController {
             List<ArticleDocument> results;
             if ("rag".equals(mode)) {
                 model.addAttribute("ragAnswer", ragService.answer(q));
-                results = documentService.semanticSearch(q, DocumentService.ARTICLE_FILTER_EXPRESSION);
+                results = articleService.semanticSearch(q, ArticleService.ARTICLE_FILTER_EXPRESSION);
             } else if ("semantic".equals(mode)) {
-                results = documentService.semanticSearch(q, DocumentService.ARTICLE_FILTER_EXPRESSION);
+                results = articleService.semanticSearch(q, ArticleService.ARTICLE_FILTER_EXPRESSION);
             } else {
-                results = documentService.keywordArticleSearch(q);
+                results = articleService.keywordSearch(q);
             }
             model.addAttribute("results", results);
 
             Map<Long, List<ThreadedDiscussionItem>> discussionsByArticleId = new LinkedHashMap<>();
             for (ArticleDocument article : results) {
-                discussionsByArticleId.put(article.id(), documentService.findThreadedDiscussionsByArticleId(article.id()));
+                discussionsByArticleId.put(article.id(), discussionService.findThreadedDiscussionsByArticleId(article.id()));
             }
             model.addAttribute("discussionsByArticleId", discussionsByArticleId);
         }
-        model.addAttribute("count", documentService.count());
+        model.addAttribute("count", articleService.count() + discussionService.count());
         return "index";
     }
 }
