@@ -6,9 +6,9 @@ app:
     query-rewrite:
       enabled: true
     dual-query:
-      enabled: false
+      enabled: true
     rerank:
-      enabled: false
+      enabled: true
   document-indexing:
     worker:
       fixed-delay-ms: 1000
@@ -26,15 +26,15 @@ spring:
     locations: classpath:db/migration/${app.database.vendor}
   ai:
     openai:
-      base-url: http://localhost:1234
+      base-url: http://192.168.1.105:11434
       api-key: lm-studio
       embedding:
         options:
-          model: text-embedding-qwen3-embedding-0.6b
+          model: qwen3-embedding:0.6b
           dimensions: 1024
       chat:
         options:
-          model: qwen/qwen3-4b-2507
+          model: kamekichi128/qwen3-4b-instruct-2507:latest
     vectorstore:
       pgvector:
         enabled: true
