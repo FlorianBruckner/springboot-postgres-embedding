@@ -95,11 +95,10 @@ public class PostgresDocumentRepository implements DocumentRepository {
 
     @Override
     public void updateDiscussionClassification(long id, String sentiment, String responseDepth) {
-        Optional<DiscussionEntity> discussionOpt = discussionRepository.findDiscussionById(id);
-        if (discussionOpt.isEmpty()) {
-            return;
-        }
-        DiscussionEntity entity = discussionOpt.get();
+        DiscussionEntity entity = discussionRepository.findDiscussionById(id)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Discussion %d was selected for classification update but could not be loaded. " +
+                                "This indicates stale ids or concurrent deletion.".formatted(id)));
 
         entity.setSentiment(sentiment);
         entity.setResponseDepth(responseDepth);
