@@ -13,7 +13,7 @@ public interface DiscussionJpaRepository extends JpaRepository<DiscussionEntity,
     @Query(value = """
             SELECT *
             FROM documents
-            WHERE article_document_id IS NOT NULL
+            WHERE (article_document_id IS NOT NULL OR parent_document_id IS NOT NULL)
               AND id = :id
             """, nativeQuery = true)
     Optional<DiscussionEntity> findDiscussionById(@Param("id") Long id);
@@ -21,7 +21,7 @@ public interface DiscussionJpaRepository extends JpaRepository<DiscussionEntity,
     @Query(value = """
             SELECT *
             FROM documents
-            WHERE article_document_id IS NOT NULL
+            WHERE (article_document_id IS NOT NULL OR parent_document_id IS NOT NULL)
               AND to_tsvector('english', title || ' ' || content) @@ plainto_tsquery('english', :term)
             ORDER BY updated_at DESC
             LIMIT :limit
@@ -40,7 +40,7 @@ public interface DiscussionJpaRepository extends JpaRepository<DiscussionEntity,
     @Query(value = """
             SELECT COUNT(*)
             FROM documents
-            WHERE article_document_id IS NOT NULL
+            WHERE (article_document_id IS NOT NULL OR parent_document_id IS NOT NULL)
             """, nativeQuery = true)
     long countDiscussions();
 }

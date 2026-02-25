@@ -14,6 +14,7 @@ public interface ArticleJpaRepository extends JpaRepository<ArticleEntity, Long>
             SELECT *
             FROM documents
             WHERE article_document_id IS NULL
+              AND parent_document_id IS NULL
               AND id = :id
             """, nativeQuery = true)
     Optional<ArticleEntity> findArticleById(@Param("id") Long id);
@@ -22,6 +23,7 @@ public interface ArticleJpaRepository extends JpaRepository<ArticleEntity, Long>
             SELECT *
             FROM documents
             WHERE article_document_id IS NULL
+              AND parent_document_id IS NULL
               AND id IN (:ids)
             """, nativeQuery = true)
     List<ArticleEntity> findArticlesByIdIn(@Param("ids") List<Long> ids);
@@ -30,6 +32,7 @@ public interface ArticleJpaRepository extends JpaRepository<ArticleEntity, Long>
             SELECT *
             FROM documents
             WHERE article_document_id IS NULL
+              AND parent_document_id IS NULL
               AND to_tsvector('english', title || ' ' || content) @@ plainto_tsquery('english', :term)
             ORDER BY updated_at DESC
             LIMIT :limit
@@ -40,6 +43,7 @@ public interface ArticleJpaRepository extends JpaRepository<ArticleEntity, Long>
             SELECT COUNT(*)
             FROM documents
             WHERE article_document_id IS NULL
+              AND parent_document_id IS NULL
             """, nativeQuery = true)
     long countArticles();
 
@@ -47,6 +51,7 @@ public interface ArticleJpaRepository extends JpaRepository<ArticleEntity, Long>
             SELECT COUNT(*)
             FROM documents
             WHERE article_document_id IS NULL
+              AND parent_document_id IS NULL
               AND id = :id
             """, nativeQuery = true)
     long countArticleById(@Param("id") long id);

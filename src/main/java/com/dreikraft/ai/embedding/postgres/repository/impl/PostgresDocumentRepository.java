@@ -95,8 +95,11 @@ public class PostgresDocumentRepository implements DocumentRepository {
 
     @Override
     public void updateDiscussionClassification(long id, String sentiment, String responseDepth) {
-        DiscussionEntity entity = discussionRepository.findDiscussionById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Document not found: " + id));
+        Optional<DiscussionEntity> discussionOpt = discussionRepository.findDiscussionById(id);
+        if (discussionOpt.isEmpty()) {
+            return;
+        }
+        DiscussionEntity entity = discussionOpt.get();
 
         entity.setSentiment(sentiment);
         entity.setResponseDepth(responseDepth);
